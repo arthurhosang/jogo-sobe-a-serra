@@ -1,0 +1,1548 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Sobe a Serra</title>
+<style>
+  body { margin: 0; background: radial-gradient(circle at top, #23384f, #0e1622); color: #fff;
+         font-family: "Segoe UI", Arial, sans-serif; min-height: 100vh;
+         display: flex; flex-direction: column; align-items: center; }
+  h1 { margin: 10px 0 4px; font-size: 24px; letter-spacing: 1px; }
+  #botoes { margin: 6px 0 8px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  button { font-size: 16px; padding: 9px 16px; border: 0; border-radius: 8px; cursor: pointer;
+           background: linear-gradient(#36b3a4, #23877b); color: #fff; font-weight: bold;
+           box-shadow: 0 3px 0 #16594f; }
+  button:hover { filter: brightness(1.12); }
+  button:disabled { opacity: 0.55; cursor: not-allowed; filter: grayscale(0.7); transform: none; }
+  button:active { transform: translateY(2px); box-shadow: 0 1px 0 #16594f; }
+  #area { display: flex; gap: 16px; align-items: flex-start; justify-content: center; flex-wrap: wrap; padding: 0 12px 12px; }
+  #colJogo { display: flex; flex-direction: column; align-items: center; }
+  canvas { border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); display: block;
+           width: 100%; height: auto; touch-action: none; }
+  /* três colunas lado a lado: o jogo ocupa o espaço que sobra entre o editor e a biblioteca */
+  #area { --ajuda: 330px; --codigo: clamp(380px, 29vw, 560px); flex-wrap: nowrap; width: 100%; box-sizing: border-box; }
+  #area.ajudaFechada { --ajuda: 52px; }
+  #colJogo { flex: 1 1 0; min-width: 0; max-width: calc((100vh - 140px) * 1.6); }
+  #colCodigo, #colAjuda { flex: 0 0 auto; }
+  #dica { font-size: 14px; color: #9fb0c3; margin: 8px 10px 0; text-align: center; }
+
+  /* --- editor do piloto --- */
+  #colCodigo { width: var(--codigo); display: flex; flex-direction: column; gap: 8px; background: rgba(10,18,28,0.65);
+               border: 1px solid #2a3b50; border-radius: 12px; padding: 10px; box-sizing: border-box; height: 560px; }
+  #colCodigo .topo { display: flex; align-items: center; gap: 8px; }
+  #colCodigo .topo b { font-size: 17px; white-space: nowrap; }
+  #nomeDupla { flex: 1; min-width: 0; font: 16px "Segoe UI", Arial; padding: 6px 10px; border-radius: 8px;
+               border: 1px solid #2a3b50; background: #0d1520; color: #fff; }
+  #editorCaixa { flex: 1; min-height: 160px; display: flex; background: #0d1520; border: 1px solid #2a3b50;
+                 border-radius: 10px; overflow: hidden; font: 15px/1.5 Consolas, "Courier New", monospace; }
+  #numeros { padding: 10px 8px 10px 6px; color: #4b6078; text-align: right; user-select: none; min-width: 26px;
+             overflow: hidden; white-space: pre; background: #0a111a; }
+  #numeros .erro { color: #fff; background: #c0392b; border-radius: 3px; padding: 0 2px; }
+  #codigoArea { position: relative; flex: 1; }
+  #realce, #editor { position: absolute; inset: 0; margin: 0; padding: 10px; font: inherit; white-space: pre;
+                     tab-size: 2; border: 0; box-sizing: border-box; }
+  #realce { color: #d6e2ef; pointer-events: none; overflow: hidden; }
+  #editor { color: transparent; background: transparent; caret-color: #fff; resize: none; outline: none; overflow: auto; }
+  #editor::selection { background: rgba(80,140,255,0.4); color: transparent; }
+  #realce .c { color: #6f8c76; } #realce .t { color: #ffd479; } #realce .k { color: #ff7ab2; }
+  #realce .n { color: #a5e85c; } #realce .s { color: #7fd1ff; }
+  #status { font: 15px "Segoe UI", Arial; padding: 7px 10px; border-radius: 8px; background: #13202f; color: #bfe3ff; min-height: 18px; }
+  #status.ok { background: #123326; color: #7ff0c0; } #status.erro { background: #3a1518; color: #ff9b9b; }
+  #depuracao { font: 14px "Segoe UI", Arial; background: #0d1520; border: 1px solid #2a3b50; border-radius: 8px;
+               padding: 7px 10px; color: #9fb0c3; display: flex; flex-direction: column; gap: 3px; }
+  #depuracao code { font: 14px Consolas, monospace; color: #7fd1ff; }
+  #dbgComando { font-size: 16px !important; color: #ffd60a !important; }
+  #dbgHistorico { font: 13px Consolas, monospace; color: #7d91a8; white-space: pre; max-height: 60px; overflow: hidden; }
+  #colCodigo .acoes { display: flex; gap: 8px; }
+  #colCodigo .acoes button { flex: 1; }
+  #colCodigo .acoes small { font-weight: normal; opacity: 0.75; font-size: 12px; }
+  button.sec { background: linear-gradient(#4a5d75, #34455a); box-shadow: 0 3px 0 #222f3e; flex: 0 0 auto !important; }
+  /* --- biblioteca de comandos (direita, dá pra recolher) --- */
+  #colAjuda { width: var(--ajuda); height: 560px; display: flex; flex-direction: column; box-sizing: border-box;
+              background: rgba(10,18,28,0.65); border: 1px solid #2a3b50; border-radius: 12px; overflow: hidden; }
+  #abaAjuda { display: none; writing-mode: vertical-rl; height: 100%; width: 100%; border-radius: 0; box-shadow: none;
+              font-size: 17px; letter-spacing: 1px; padding: 14px 0; }
+  #colAjuda.fechada #abaAjuda { display: block; }
+  #colAjuda.fechada #ajudaConteudo { display: none; }
+  #ajudaConteudo { padding: 12px 14px; overflow: auto; font: 15px/1.45 "Segoe UI", Arial; color: #d6e2ef; }
+  .ajudaTopo { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .ajudaTopo b { font-size: 17px; }
+  .ajudaTopo button { padding: 4px 10px; font-size: 14px; }
+  .dicaAjuda { margin: 4px 0 2px; font-size: 13px; color: #8fa3b8; }
+  #ajudaConteudo h3 { font-size: 16px; margin: 14px 0 6px; color: #ffd60a; }
+  .item { padding: 7px 10px; border-radius: 8px; cursor: pointer; margin-bottom: 5px; background: rgba(255,255,255,0.04); }
+  .item:hover { background: rgba(127,209,255,0.14); }
+  .item code { display: block; font: 15px Consolas, monospace; color: #7fd1ff; white-space: pre-wrap; }
+  .item span { display: block; font-size: 14px; color: #b9c8d8; margin-top: 2px; }
+  .pontos div { font-size: 15px; margin: 3px 0; }
+
+  #colCodigo { order: -1; }   /* editor do lado esquerdo do jogo */
+  #colJogo { order: 0; } #colAjuda { order: 1; }
+  /* telas médias (notebook com zoom, por exemplo): continua tudo lado a lado, só mais apertado */
+  @media (max-width: 1100px) {
+    #area { --codigo: 330px; --ajuda: 270px; gap: 10px; padding: 0 8px 8px; }
+    #area.ajudaFechada { --ajuda: 46px; }
+    #editorCaixa { font-size: 14px; }
+    #colCodigo .topo { flex-wrap: wrap; } #nomeDupla { flex-basis: 100%; }
+    #ajudaConteudo { font-size: 14px; padding: 10px; }
+    .item code { font-size: 14px; }
+  }
+  /* só em tela bem estreita (celular) a biblioteca vai pra baixo */
+  @media (max-width: 760px) {
+    #area { flex-wrap: wrap; }
+    #colJogo { flex: 0 0 auto; width: 96vw; max-width: none; } #colCodigo { width: 96vw; order: 1; } #colAjuda, #area.ajudaFechada #colAjuda { width: 96vw; order: 2; }
+    #abaAjuda { writing-mode: horizontal-tb; }
+  }
+</style>
+</head>
+<body>
+<h1>⛰️ SOBE A SERRA</h1>
+<div id="area">
+<div id="colJogo">
+<div id="botoes">
+  <button id="btnJogar" style="display:none" onclick="iniciar('manual')">🎮 Jogar (setas ou WASD)</button>
+  <button id="btnPausa" onclick="alternarPausa()">⏸ Pausar</button>
+  <button id="btnTurbo" onclick="alternarTurbo()">Velocidade do jogo: 1x</button>
+  <button onclick="alternarRanking()">🏆 Ranking</button>
+  <button id="btnSom" onclick="alternarSom()">🔊 Som</button>
+</div>
+<canvas id="tela" width="800" height="500"></canvas>
+<div id="dica">Escreva o piloto no editor e clique em ▶ Testar (ou Ctrl+Enter). A tecla R reinicia.</div>
+</div>
+
+<div id="colCodigo">
+  <div class="topo"><b>🤖 Nome do Piloto Automático</b><input id="nomeDupla" maxlength="20" placeholder="Jarvis"></div>
+  <div id="editorCaixa">
+    <div id="numeros"></div>
+    <div id="codigoArea">
+      <pre id="realce"></pre>
+      <textarea id="editor" spellcheck="false" wrap="off" autocapitalize="off" autocomplete="off"></textarea>
+    </div>
+  </div>
+  <div id="status">Edite a função e clique em ▶ Testar piloto.</div>
+  <div id="depuracao">
+    <div>🕹️ Comando agora: <code id="dbgComando">—</code></div>
+    <div>👀 Sensores: <code id="dbgSensores">—</code></div>
+    <div id="dbgHistorico"></div>
+  </div>
+  <div class="acoes">
+    <button onclick="testarPiloto()">▶ Testar piloto <small>Ctrl+Enter</small></button>
+    <button class="sec" onclick="restaurarExemplo()" title="Volta o código de exemplo">↺ Exemplo</button>
+  </div>
+</div>
+
+<div id="colAjuda">
+  <button id="abaAjuda" onclick="alternarAjuda()" title="Mostrar a biblioteca de comandos">📖 Comandos</button>
+  <div id="ajudaConteudo">
+    <div class="ajudaTopo"><b>📖 Biblioteca de comandos</b><button class="sec" onclick="alternarAjuda()" title="Esconder">✕</button></div>
+    <p class="dicaAjuda">Clique num item pra colocar ele no código, onde está o cursor.</p>
+
+    <h3>🕹️ Comandos (controle)</h3>
+    <div class="item" data-inserir="controle.paraEsquerda();"><code>controle.paraEsquerda()</code><span>muda para a faixa da esquerda</span></div>
+    <div class="item" data-inserir="controle.paraDireita();"><code>controle.paraDireita()</code><span>muda para a faixa da direita</span></div>
+    <div class="item" data-inserir="controle.frear();"><code>controle.frear()</code><span>diminui a velocidade</span></div>
+    <div class="item" data-inserir="controle.acelerar();"><code>controle.acelerar()</code><span>segue reto acelerando (é o padrão se não mandar nada)</span></div>
+
+    <h3>🛣️ Faixas</h3>
+    <div class="item" data-inserir="ESQUERDA"><code>ESQUERDA</code><span>faixa da esquerda (junto do paredão)</span></div>
+    <div class="item" data-inserir="MEIO"><code>MEIO</code><span>faixa do meio</span></div>
+    <div class="item" data-inserir="DIREITA"><code>DIREITA</code><span>faixa da direita (junto da pirambeira)</span></div>
+    <div class="item" data-inserir="NENHUMA"><code>NENHUMA</code><span>quando não tem faixa, por exemplo nenhuma moeda à vista</span></div>
+
+    <h3>👀 Sensores (sensor)</h3>
+    <div class="item" data-inserir="sensor.faixa"><code>sensor.faixa</code><span>faixa atual: ESQUERDA, MEIO ou DIREITA</span></div>
+    <div class="item" data-inserir="sensor.distanciaObstaculo(sensor.faixa)"><code>sensor.distanciaObstaculo(faixa)</code><span>metros livres até o obstáculo nessa faixa. 999 = nada à vista, fora da estrada = 0</span></div>
+    <div class="item" data-inserir="sensor.oQueTem(sensor.faixa)"><code>sensor.oQueTem(f)</code><span>"pedra", "vaca", "ciclista", "nada" ou "fora"</span></div>
+    <div class="item" data-inserir="sensor.faixaDaMoeda"><code>sensor.faixaDaMoeda</code><span>faixa da moeda mais perto: ESQUERDA, MEIO, DIREITA ou NENHUMA</span></div>
+    <div class="item" data-inserir="sensor.distanciaMoeda(sensor.faixa)"><code>sensor.distanciaMoeda(f)</code><span>metros até a próxima moeda na faixa f</span></div>
+    <div class="item" data-inserir="sensor.neblina"><code>sensor.neblina</code><span>true na neblina (aí você só enxerga 30 m)</span></div>
+    <div class="item" data-inserir="sensor.velocidade"><code>sensor.velocidade</code><span>velocidade em km/h</span></div>
+    <div class="item" data-inserir="sensor.tempoRestante"><code>sensor.tempoRestante</code><span>segundos até a Serra fechar</span></div>
+    <div class="item" data-inserir="sensor.faltaParaMirante"><code>sensor.faltaParaMirante</code><span>metros até a chegada</span></div>
+
+    <h3>🧩 Exemplos prontos</h3>
+    <div class="item" data-inserir="if (sensor.neblina) {&#10;    controle.frear();&#10;  }"><code>if (sensor.neblina) {
+  controle.frear();
+}</code><span>freia na neblina</span></div>
+    <div class="item" data-inserir="if (sensor.distanciaObstaculo(sensor.faixa) &lt; 20) {&#10;    controle.paraEsquerda();&#10;  }"><code>if (sensor.distanciaObstaculo(sensor.faixa) &lt; 20) {
+  controle.paraEsquerda();
+}</code><span>desvia quando tem algo perto</span></div>
+    <div class="item" data-inserir="if (sensor.faixaDaMoeda &gt; sensor.faixa) {&#10;    controle.paraDireita();&#10;  }"><code>if (sensor.faixaDaMoeda &gt; sensor.faixa) {
+  controle.paraDireita();
+}</code><span>vai atrás da moeda que está à direita</span></div>
+
+    <h3>⭐ Pontos</h3>
+    <div class="pontos">
+      <div>🪙 moeda: <b>10</b></div>
+      <div>✨ passar raspando ("QUASE!"): <b>25</b></div>
+      <div>🏁 chegar ao mirante: <b>1000</b> + 10 por segundo que sobrou</div>
+      <div>📏 se não chegar: 1 ponto a cada 3 m</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+  // Guarda erros de digitação no código dos alunos, pra mostrar na tela.
+  window.erroNoCodigo = null;
+  window.addEventListener("error", function (e) {
+    if (!window.erroNoCodigo) window.erroNoCodigo = e.message + " (linha " + e.lineno + ")";
+  });
+</script>
+
+<script>
+// =====================================================================
+//  ⛰️  SOBE A SERRA  —  ÁREA DOS ALUNOS
+//  O jeito mais fácil: escrevam o piloto no EDITOR à direita do jogo e cliquem
+//  em ▶ Testar. O código fica salvo no navegador deste computador.
+//  Aqui no arquivo ficam as configurações (salvem com Ctrl+S e apertem F5).
+// =====================================================================
+
+const NOME_DO_PILOTO    = "Jarvis";  // nome do piloto automático (aparece no ranking)
+const COR_DO_CARRO      = "#e63946";  // tente "blue", "orange", "#00b894"...
+const VELOCIDADE_MAXIMA = 90;         // km/h (o jogo aceita de 30 a 140)
+const TAMANHO_DA_SERRA  = 3000;       // metros até o mirante
+const TEMPO_LIMITE      = 180;        // segundos até a Serra fechar
+const SEMENTE           = 2026;       // mesma semente = mesma estrada pra todo mundo
+
+// ---------------------------------------------------------------------
+//  PILOTO AUTOMÁTICO
+//  O jogo chama esta função 60 vezes por segundo e pergunta:
+//  "e agora, o que o carro faz?"
+//
+//  Ela recebe duas coisas:
+//    controle → os comandos do carro
+//    sensor   → o que o carro está "vendo" (lista abaixo)
+//
+//  Os comandos (controle):
+//    controle.paraEsquerda() → muda para a faixa da esquerda
+//    controle.paraDireita()  → muda para a faixa da direita
+//    controle.frear()        → diminui a velocidade
+//    controle.acelerar()     → segue reto, acelerando (é o que acontece se não mandar nada)
+//
+//  As faixas têm nome: ESQUERDA, MEIO e DIREITA (e NENHUMA quando não tem faixa)
+//
+//  Os sensores do carro (sensor):
+//    sensor.faixa            → faixa atual: ESQUERDA, MEIO ou DIREITA
+//    sensor.distanciaObstaculo(faixa) → metros livres até o próximo obstáculo nessa faixa
+//                              (999 = não vê nada; fora da estrada = 0)
+//    sensor.oQueTem(faixa)   → "pedra", "vaca", "ciclista", "nada" ou "fora"
+//    sensor.neblina          → true se está na neblina (ou entrando nela)
+//    sensor.velocidade       → velocidade atual em km/h
+//    sensor.tempoRestante    → segundos até a Serra fechar
+//    sensor.faltaParaMirante → metros até a chegada
+//    sensor.distanciaMoeda(faixa) → metros até a próxima moeda nessa faixa
+//                              (999 = nenhuma moeda à vista)
+//    sensor.faixaDaMoeda     → faixa da moeda mais perto que dá pra ver
+//                              (ESQUERDA, MEIO, DIREITA ou NENHUMA)
+//
+//  PONTUAÇÃO (vai pro 🏆 Ranking):
+//    🪙 cada moeda ............................ 10 pontos
+//    ✨ cada "QUASE!" (desviar no último segundo) 25 pontos
+//    🏁 chegar ao mirante ...................... 1000 pontos + 10 por segundo que sobrou
+//    (se não chegar, ganha 1 ponto a cada 3 metros percorridos)
+// ---------------------------------------------------------------------
+
+function pilotoAutomatico(controle, sensor) {
+
+  // Espaço livre (em metros) em cada faixa
+  const espacoEsquerda = sensor.distanciaObstaculo(ESQUERDA);
+  const espacoMeio     = sensor.distanciaObstaculo(MEIO);
+  const espacoDireita  = sensor.distanciaObstaculo(DIREITA);
+  const espaco = [espacoEsquerda, espacoMeio, espacoDireita];
+
+  // Qual faixa tem MAIS espaço?
+  let melhor = sensor.faixa;
+  if (espacoEsquerda > espaco[melhor]) melhor = ESQUERDA;
+  if (espacoMeio     > espaco[melhor]) melhor = MEIO;
+  if (espacoDireita  > espaco[melhor]) melhor = DIREITA;
+
+  // Obstáculo perto? Vai pra melhor faixa
+  if (espaco[sensor.faixa] < 25) {
+    if (melhor < sensor.faixa) {
+      controle.paraEsquerda();
+    }
+    if (melhor > sensor.faixa) {
+      controle.paraDireita();
+    }
+  }
+}
+
+// IDEIAS PARA MELHORAR O PILOTO:
+//  1. Indo da faixa 0 pra 2, o carro passa pela 1. E se tiver algo perto
+//     no meio do caminho? (dica: se faixa1 for pequeno, melhor controle.frear())
+//  2. Ele só reage quando o obstáculo está a 25 m. Testem outros valores!
+//  3. Na neblina vocês enxergam bem menos. Que tal frear quando sensor.neblina for true?
+//  4. Ciclista anda devagar: dá pra tratar diferente de uma pedra (sensor.oQueTem).
+//  5. Testem outra SEMENTE: um bom piloto funciona em qualquer estrada!
+//  6. Moedas dão pontos! Descubram onde está a próxima (sensor.faixaDaMoeda)
+//     e vão buscar quando o caminho estiver livre: sensor.distanciaObstaculo(...) > 40
+</script>
+
+<script>
+// =====================================================================
+//  MOTOR DO JOGO — não precisa mexer daqui pra baixo
+//  (mas pode ler e fuçar à vontade!)
+// =====================================================================
+
+const erroDeDigitacao = window.erroNoCodigo;
+const tela = document.getElementById("tela");
+const ctx = tela.getContext("2d");
+const LARG = tela.width, ALT = tela.height;
+
+// Regras do jogo (em metros e segundos)
+// Tamanhos reais (metros), iguais aos desenhos: comp = ao longo da estrada, larg = de lado.
+const CARRO = { comp: 1.2, larg: 2.0 };   // comp = faixa de contato a partir da traseira (o que se vê de trás)
+const TAM_OBST = { pedra: { comp: 2.0, larg: 2.2 }, vaca: { comp: 1.0, larg: 2.6 }, ciclista: { comp: 1.8, larg: 0.8 } };
+const TOLERANCIA = 0.35;   // um tiquinho de perdão nas laterais
+const VISAO_NORMAL = 80, VISAO_NEBLINA = 30;
+const VEL_MIN = 8, DT = 1 / 60, TEMPO_TROCA = 0.18;
+const TOTAL_CURVAS = 284;
+
+// Nomes das faixas, pra usar no piloto automático
+const ESQUERDA = 0, MEIO = 1, DIREITA = 2, NENHUMA = -1;
+const NADA_A_VISTA = 999;   // o que os sensores de distância devolvem quando não veem nada
+function nomeDaFaixa(f) { return ["ESQUERDA", "MEIO", "DIREITA"][f] || "NENHUMA"; }
+const NOMES = { pedra: "pedra na pista", vaca: "vaca na estrada", ciclista: "ciclista" };
+
+// Câmera 3D
+const HORIZONTE = 250;        // altura do horizonte na tela
+const FOCO = 330;             // "zoom" da câmera
+const CAM_ATRAS = 7;          // metros atrás do carro
+const CAM_ALTURA = 4.2;       // metros acima da estrada
+const FAIXA_M = 4, MEIA_ESTRADA = 6;
+const DESENHO_LONGE = 190, PASSO_SEG = 2;
+
+const cfg = {
+  equipe: typeof NOME_DO_PILOTO !== "undefined" ? String(NOME_DO_PILOTO) : "Jarvis",
+  cor: typeof COR_DO_CARRO !== "undefined" ? COR_DO_CARRO : "#e63946",
+  velMax: Math.min(140, Math.max(30, typeof VELOCIDADE_MAXIMA !== "undefined" ? (+VELOCIDADE_MAXIMA || 90) : 90)) / 3.6,
+  meta: Math.max(300, typeof TAMANHO_DA_SERRA !== "undefined" ? (+TAMANHO_DA_SERRA || 3000) : 3000),
+  tempoLimite: Math.max(10, typeof TEMPO_LIMITE !== "undefined" ? (+TEMPO_LIMITE || 180) : 180),
+  semente: typeof SEMENTE !== "undefined" ? (+SEMENTE || 1) : 2026,
+};
+
+// Sorteio com semente: a mesma semente sempre gera a mesma estrada.
+function criarSorteio(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function gerarEstrada() {
+  const r = criarSorteio(cfg.semente);
+  const obst = [], neblinas = [];
+  let p = 60;
+  while (p < cfg.meta - 40) {
+    const faixas = [0, 1, 2];
+    for (let i = 2; i > 0; i--) { const k = Math.floor(r() * (i + 1)); [faixas[i], faixas[k]] = [faixas[k], faixas[i]]; }
+    const qtd = r() < 0.3 ? 2 : 1;          // às vezes bloqueia duas faixas (sempre sobra uma)
+    let temCiclista = false;
+    for (let i = 0; i < qtd; i++) {
+      const n = r();
+      const tipo = n < 0.45 ? "pedra" : n < 0.75 ? "vaca" : "ciclista";
+      if (tipo === "ciclista") temCiclista = true;
+      obst.push({ faixa: faixas[i], pos: p, tipo });
+    }
+    p += 30 + r() * 45 + (temCiclista ? 25 : 0);
+  }
+  let q = 300;
+  while (q < cfg.meta - 200) {
+    const tam = 120 + r() * 150;
+    neblinas.push({ ini: q, fim: q + tam });
+    q += tam + 400 + r() * 500;
+  }
+  return { obst, neblinas };
+}
+
+// Moedas: trilhas de 3 a 5 moedas numa faixa (outro sorteio, pra não mudar os obstáculos).
+function gerarMoedas(obst) {
+  const r = criarSorteio(cfg.semente * 7 + 13);
+  const moedas = [];
+  let p = 80;
+  while (p < cfg.meta - 60) {
+    const f = Math.floor(r() * 3), n = 3 + Math.floor(r() * 3);
+    for (let i = 0; i < n; i++) {
+      const pos = p + i * 7;
+      if (obst.some(o => o.faixa === f && Math.abs(o.pos - pos) < 9)) continue;
+      moedas.push({ faixa: f, pos, pegou: false });
+    }
+    p += 50 + r() * 60;
+  }
+  return moedas;
+}
+
+const PONTOS = { moeda: 10, quase: 25, chegada: 1000, porSegundo: 10 };
+function calcularPontos(j) {
+  let p = j.pegas * PONTOS.moeda + j.quase * PONTOS.quase;
+  if (j.fim && j.fim.tipo === "chegou") p += PONTOS.chegada + Math.floor(cfg.tempoLimite - j.tempo) * PONTOS.porSegundo;
+  else p += Math.floor(Math.min(j.dist, cfg.meta) / 3);
+  return p;
+}
+
+let jogo, turbo = 1, teclas = {}, ultimoModo = "auto", acumulado = 0, relogio = 0;
+
+// O modo manual (setas/WASD) só libera depois desta data e hora do computador
+const LIBERA_MANUAL = new Date(2026, 10, 24, 12, 0, 0);   // 24/11/2026 12:00 (mês 10 = novembro)
+function manualLiberado() { return new Date() > LIBERA_MANUAL; }
+function atualizarBotaoJogar() {
+  const b = document.getElementById("btnJogar");
+  if (!b || !("disabled" in b)) return;
+  const ok = manualLiberado();
+  b.disabled = !ok;
+  b.style.display = ok ? "" : "none";     // fica escondido até liberar
+}
+
+function novoJogo(modo) {
+  const e = gerarEstrada();
+  return { modo, dist: 0, vel: 12, tempo: 0, faixa: 1, faixaVisual: 1, trocando: 0,
+           freando: false, obst: e.obst, neblinas: e.neblinas, moedas: gerarMoedas(e.obst),
+           pegas: 0, quase: 0, ultimaTroca: -10, pontos: 0, posicao: 0, fim: null,
+           comando: "—", historico: [] };
+}
+
+function iniciar(modo) {
+  if (modo === "manual" && !manualLiberado()) {
+    if (typeof mostrarStatus === "function") mostrarStatus("Use o piloto automático: escreva o código e clique em ▶ Testar piloto.", "erro");
+    return;
+  }
+  ultimoModo = modo;
+  teclas = {};
+  acumulado = 0;
+  iniciarAudio();
+  particulas = []; textos = []; tremor = 0; mostrarRanking = false;
+  pausado = false; atualizarBotaoPausa();
+  jogo = novoJogo(modo);
+  if (modo === "auto") {
+    const r = typeof aplicarCodigo === "function" ? aplicarCodigo()
+            : { ok: typeof pilotoAutomatico === "function", erro: "Não achei a função pilotoAutomatico." };
+    if (!r.ok) { jogo.fim = { tipo: "erro", info: r.erro }; jogo.fimRelogio = relogio; }
+  }
+  if (document.activeElement) document.activeElement.blur();
+}
+
+// ---------- Pausa ----------
+let pausado = false;
+function atualizarBotaoPausa() {
+  const b = document.getElementById("btnPausa");
+  if (b && "textContent" in b) b.textContent = pausado ? "▶ Continuar" : "⏸ Pausar";
+}
+function alternarPausa() {
+  const rodando = jogo.modo !== "espera" && !jogo.fim;
+  pausado = rodando ? !pausado : false;
+  atualizarBotaoPausa();
+  if (document.activeElement) document.activeElement.blur();
+}
+
+function alternarTurbo() {
+  turbo = turbo === 1 ? 3 : 1;
+  document.getElementById("btnTurbo").textContent = "Velocidade do jogo: " + turbo + "x";
+  document.activeElement.blur();
+}
+
+// ---------- Som (gerado na hora pelo navegador, sem arquivos) ----------
+let audio = null, somLigado = true;
+function iniciarAudio() {
+  try {
+    if (audio) { audio.ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    const c = new AC();
+    const mestre = c.createGain(); mestre.gain.value = 0.5; mestre.connect(c.destination);
+    const motor = c.createOscillator(); motor.type = "sawtooth";
+    const motor2 = c.createOscillator(); motor2.type = "square";
+    const filtro = c.createBiquadFilter(); filtro.type = "lowpass"; filtro.frequency.value = 500;
+    const volMotor = c.createGain(); volMotor.gain.value = 0;
+    motor.connect(filtro); motor2.connect(filtro); filtro.connect(volMotor); volMotor.connect(mestre);
+    motor.start(); motor2.start();
+    const buf = c.createBuffer(1, c.sampleRate, c.sampleRate), dados = buf.getChannelData(0);
+    for (let i = 0; i < dados.length; i++) dados[i] = Math.random() * 2 - 1;
+    audio = { ctx: c, mestre, motor, motor2, filtro, volMotor, ruido: buf };
+  } catch (e) { audio = null; }
+}
+function alternarSom() {
+  somLigado = !somLigado;
+  document.getElementById("btnSom").textContent = somLigado ? "🔊 Som" : "🔇 Sem som";
+  document.activeElement.blur();
+}
+function atualizarMotor() {
+  if (!audio) return;
+  const t = audio.ctx.currentTime, frac = jogo.vel / (140 / 3.6), f = 50 + frac * 160;
+  const ligado = somLigado && jogo.modo !== "espera" && !jogo.fim && !pausado;
+  audio.motor.frequency.setTargetAtTime(f, t, 0.05);
+  audio.motor2.frequency.setTargetAtTime(f * 0.5, t, 0.05);
+  audio.filtro.frequency.setTargetAtTime(350 + frac * 1300, t, 0.05);
+  audio.volMotor.gain.setTargetAtTime(ligado ? 0.07 : 0, t, 0.08);
+}
+function tom(freq, dur, tipo, vol, freqFim, atraso) {
+  if (!audio || !somLigado) return;
+  const c = audio.ctx, t = c.currentTime + (atraso || 0);
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = tipo || "square";
+  o.frequency.setValueAtTime(freq, t);
+  if (freqFim) o.frequency.exponentialRampToValueAtTime(freqFim, t + dur);
+  g.gain.setValueAtTime(vol || 0.15, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(audio.mestre); o.start(t); o.stop(t + dur + 0.05);
+}
+function chiado(dur, vol, freq, tipoFiltro) {
+  if (!audio || !somLigado) return;
+  const c = audio.ctx, t = c.currentTime;
+  const fonte = c.createBufferSource(); fonte.buffer = audio.ruido;
+  const f = c.createBiquadFilter(); f.type = tipoFiltro || "bandpass"; f.frequency.value = freq;
+  const g = c.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  fonte.connect(f); f.connect(g); g.connect(audio.mestre); fonte.start(t); fonte.stop(t + dur + 0.05);
+}
+
+// ---------- Efeitos: partículas, textos que sobem e tremor da tela ----------
+let particulas = [], textos = [], tremor = 0, carroTela = { x: LARG / 2, y: 440, s: 47 };
+function explodir(x, y, qtd, cores, forca) {
+  for (let i = 0; i < qtd; i++) {
+    const a = Math.random() * Math.PI * 2, v = (0.3 + Math.random()) * forca;
+    particulas.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - forca * 0.6,
+                      vida: 0.6 + Math.random() * 0.8, cor: cores[i % cores.length], tam: 3 + Math.random() * 5 });
+  }
+}
+function mostrarTexto(txt, corTexto, tamanho) {
+  textos.push({ txt, cor: corTexto, tam: tamanho || 30, x: carroTela.x, y: carroTela.y - 90, vida: 1 });
+}
+function evento(tipo) {
+  const c = carroTela;
+  if (tipo === "troca") chiado(0.18, 0.12, 1500);
+  else if (tipo === "moeda") {
+    tom(988, 0.07, "square", 0.1); tom(1319, 0.14, "square", 0.1, null, 0.07);
+    explodir(c.x, c.y - 40, 10, ["#ffd60a", "#fff3b0"], 140);
+    mostrarTexto("+" + PONTOS.moeda, "#ffd60a", 24);
+  } else if (tipo === "quase") {
+    tom(660, 0.1, "triangle", 0.2, 990); tom(990, 0.18, "triangle", 0.2, 1480, 0.08);
+    mostrarTexto("QUASE! +" + PONTOS.quase, "#4cd3a5", 36);
+  } else if (tipo === "bateu") {
+    chiado(0.7, 0.6, 500, "lowpass"); tom(140, 0.5, "sawtooth", 0.3, 40);
+    tremor = 18;
+    explodir(c.x, c.y - 30, 50, [cfg.cor, "#333", "#ff9f1c", "#ddd"], 420);
+  } else if (tipo === "chegou") {
+    [523, 659, 784, 1047].forEach((f, i) => tom(f, 0.3, "square", 0.12, null, i * 0.12));
+    for (let i = 0; i < 8; i++) explodir(80 + i * 90, 60, 14, ["#ffd60a", "#ff6b6b", "#4cd3a5", "#4ea8ff", "#fff"], 260);
+  } else if (tipo === "fechou") tom(330, 0.8, "sawtooth", 0.2, 90);
+}
+function atualizarEfeitos(dt) {
+  tremor = Math.max(0, tremor - dt * 30);
+  for (const p of particulas) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 600 * dt; p.vida -= dt; }
+  particulas = particulas.filter(p => p.vida > 0);
+  for (const t of textos) { t.y -= 50 * dt; t.vida -= dt * 0.9; }
+  textos = textos.filter(t => t.vida > 0);
+}
+function desenharEfeitos() {
+  for (const p of particulas) {
+    ctx.globalAlpha = Math.min(1, p.vida * 2); ctx.fillStyle = p.cor;
+    ctx.fillRect(p.x - p.tam / 2, p.y - p.tam / 2, p.tam, p.tam);
+  }
+  ctx.textAlign = "center";
+  for (const t of textos) {
+    ctx.globalAlpha = Math.min(1, t.vida * 2);
+    ctx.font = "900 " + t.tam + "px 'Segoe UI', Arial";
+    ctx.lineWidth = 5; ctx.strokeStyle = "rgba(0,0,0,0.6)"; ctx.strokeText(t.txt, t.x, t.y);
+    ctx.fillStyle = t.cor; ctx.fillText(t.txt, t.x, t.y);
+  }
+  ctx.globalAlpha = 1;
+}
+function desenharVento() {   // linhas de vento quando o carro está rápido
+  const frac = (jogo.vel - 15) / Math.max(1, cfg.velMax - 15);
+  if (frac <= 0 || jogo.fim || jogo.modo === "espera" || pausado) return;
+  ctx.strokeStyle = "rgba(255,255,255," + (0.12 + 0.25 * frac).toFixed(2) + ")"; ctx.lineWidth = 2;
+  const n = Math.floor(6 + frac * 18), cx = LARG / 2, cy = HORIZONTE;
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, r1 = 280 + Math.random() * 160, comp = 40 + frac * 120;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1 * 0.75);
+    ctx.lineTo(cx + Math.cos(a) * (r1 + comp), cy + Math.sin(a) * (r1 + comp) * 0.75);
+    ctx.stroke();
+  }
+}
+
+// ---------- Ranking (guardado neste computador) ----------
+const CHAVE_RANKING = "sobeASerra.ranking";
+let mostrarRanking = false, ultimoId = null;
+function chaveEstrada() { return cfg.semente + "|" + cfg.meta + "|" + cfg.tempoLimite; }
+function lerRanking() { try { return JSON.parse(localStorage.getItem(CHAVE_RANKING) || "[]"); } catch (e) { return []; } }
+function rankingDaEstrada() { return lerRanking().filter(x => x.estrada === chaveEstrada()).sort((a, b) => b.pontos - a.pontos); }
+function salvarNoRanking() {
+  const lista = lerRanking();
+  const item = { nome: (cfg.equipe || "Jarvis").slice(0, 20), pontos: jogo.pontos, modo: jogo.modo,
+                 chegou: jogo.fim.tipo === "chegou", tempo: jogo.tempo, dist: Math.floor(jogo.dist),
+                 estrada: chaveEstrada(), id: Date.now() + Math.random() };
+  lista.push(item);
+  try { localStorage.setItem(CHAVE_RANKING, JSON.stringify(lista.slice(-300))); } catch (e) {}
+  ultimoId = item.id;
+  jogo.posicao = rankingDaEstrada().findIndex(x => x.id === item.id) + 1;
+}
+function alternarRanking() { mostrarRanking = !mostrarRanking; if (document.activeElement) document.activeElement.blur(); }
+function limparRanking() {
+  if (confirm("Apagar o ranking deste computador?")) { try { localStorage.removeItem(CHAVE_RANKING); } catch (e) {} }
+}
+
+// ---------- Sensores ----------
+function naNeblina(m) { return jogo.neblinas.some(z => m >= z.ini && m <= z.fim); }
+function neblinaPerto() { return jogo.neblinas.some(z => z.ini < jogo.dist + 40 && z.fim > jogo.dist); }
+
+function visivel(o) {
+  const d = o.pos - jogo.dist;
+  const limite = (naNeblina(jogo.dist) || naNeblina(o.pos)) ? VISAO_NEBLINA : VISAO_NORMAL;
+  return d <= limite;
+}
+
+function proximoNaFaixa(f) {
+  let melhor = null, menor = Infinity;
+  for (const o of jogo.obst) {
+    if (o.faixa !== f) continue;
+    const t = TAM_OBST[o.tipo];
+    const espaco = (o.pos - t.comp / 2) - (jogo.dist + CARRO.comp);   // da frente do carro até a traseira do obstáculo
+    if (o.pos + t.comp / 2 < jogo.dist || !visivel(o)) continue;        // já ficou pra trás
+    if (espaco < menor) { menor = espaco; melhor = o; }
+  }
+  return { obst: melhor, espaco: melhor ? Math.max(0, Math.round(menor * 10) / 10) : NADA_A_VISTA };
+}
+
+function faixaDaProximaMoeda() {
+  let melhor = -1, menor = Infinity;
+  for (const c of jogo.moedas) {
+    if (c.pegou) continue;
+    const d = c.pos - jogo.dist;
+    if (d < -0.5 || !visivel(c)) continue;
+    if (d < menor) { menor = d; melhor = c.faixa; }
+  }
+  return melhor;
+}
+
+function montarSensores() {
+  return {
+    faixa: jogo.faixa,
+    distanciaObstaculo: f => (f < 0 || f > 2) ? 0 : proximoNaFaixa(f).espaco,
+    oQueTem: f => {
+      if (f < 0 || f > 2) return "fora";
+      const p = proximoNaFaixa(f);
+      return p.obst ? p.obst.tipo : "nada";
+    },
+    neblina: neblinaPerto(),
+    velocidade: Math.round(jogo.vel * 3.6),
+    tempoRestante: Math.max(0, Math.round(cfg.tempoLimite - jogo.tempo)),
+    faltaParaMirante: Math.max(0, Math.round(cfg.meta - jogo.dist)),
+    faixaDaMoeda: faixaDaProximaMoeda(),
+    distanciaMoeda: f => {
+      if (f < 0 || f > 2) return NADA_A_VISTA;
+      let menor = Infinity;
+      for (const c of jogo.moedas) {
+        if (c.pegou || c.faixa !== f) continue;
+        const d = c.pos - jogo.dist;
+        if (d < -2 || !visivel(c)) continue;
+        if (d < menor) menor = d;
+      }
+      return menor === Infinity ? NADA_A_VISTA : Math.max(0, Math.round(menor * 10) / 10);
+    },
+  };
+}
+
+// ---------- Física ----------
+function mudarFaixa(direcao) {
+  if (jogo.trocando > 0) return;
+  const nova = jogo.faixa + (direcao === "esquerda" ? -1 : 1);
+  if (nova < 0 || nova > 2) return;
+  jogo.faixa = nova;
+  jogo.trocando = TEMPO_TROCA;
+  jogo.ultimaTroca = jogo.tempo;
+  evento("troca");
+}
+
+// Colisão: as caixas do carro e do obstáculo se encostam? (usa a posição que aparece na tela)
+function bateu(o) {
+  const t = TAM_OBST[o.tipo];
+  const tras = jogo.dist, frente = jogo.dist + CARRO.comp;
+  if (o.pos + t.comp / 2 < tras || o.pos - t.comp / 2 > frente) return false;
+  const dx = Math.abs((jogo.faixaVisual - o.faixa) * FAIXA_M);
+  return dx < CARRO.larg / 2 + t.larg / 2 - TOLERANCIA;
+}
+
+function terminar(tipo, info) {
+  jogo.fim = { tipo, info };
+  jogo.fimRelogio = relogio;              // espera um pouco antes do placar, pra ver a batida
+  if (tipo === "erro") { if (typeof mostrarStatus === "function") mostrarStatus("❌ " + info, "erro"); return; }
+  jogo.pontos = calcularPontos(jogo);
+  salvarNoRanking();
+  evento(tipo);
+}
+
+// Os comandos que o piloto automático pode dar
+let acaoControle = null;
+const controle = {
+  paraEsquerda: () => { acaoControle = "esquerda"; },
+  paraDireita:  () => { acaoControle = "direita"; },
+  frear:    () => { acaoControle = "frear"; },
+  acelerar: () => { acaoControle = "ficar"; },
+};
+
+function passo() {
+  const j = jogo;
+  let acao = "ficar";
+
+  if (j.modo === "auto") {
+    acaoControle = null;
+    let devolveu;
+    try { devolveu = acao = pilotoAutomatico(controle, montarSensores()); }
+    catch (err) {
+      const linha = typeof linhaDoErro === "function" ? linhaDoErro(err) : 0;
+      const msg = typeof traduzirErro === "function" ? traduzirErro(err.message) : err.message;
+      return terminar("erro", "Erro no seu código" + (linha ? " (linha " + linha + ")" : "") + ": " + msg);
+    }
+    if (acao === undefined) acao = acaoControle || "ficar";   // vale o último comando do controle
+    // guarda o comando pra mostrar na depuração
+    const NOME_CMD = { esquerda: "controle.paraEsquerda()", direita: "controle.paraDireita()", frear: "controle.frear()", ficar: "controle.acelerar()" };
+    const cmd = devolveu !== undefined ? 'return "' + devolveu + '"' : acaoControle ? NOME_CMD[acaoControle] : "nenhum (acelera)";
+    if (cmd !== j.comando) {
+      j.comando = cmd;
+      j.historico.push(Math.floor(j.dist) + " m → " + cmd);
+      if (/esquerda|direita|frear/i.test(cmd)) j.ultimaAcao = { cmd, t: j.tempo };
+      if (j.historico.length > 40) j.historico.shift();
+    }
+    if (!["esquerda", "direita", "ficar", "frear"].includes(acao)) {
+      return terminar("erro", 'O piloto devolveu "' + acao + '". Para mover o carro, use controle.paraEsquerda(), controle.paraDireita(), controle.frear() ou controle.acelerar().');
+    }
+    if (acao === "esquerda" || acao === "direita") mudarFaixa(acao);
+  } else {
+    if (teclas.pendente && j.trocando <= 0) { mudarFaixa(teclas.pendente); teclas.pendente = null; }
+    if (teclas.baixo) acao = "frear";
+  }
+
+  j.freando = acao === "frear";
+  j.vel += (j.freando ? -12 : 2.5) * DT;
+  j.vel = Math.max(VEL_MIN, Math.min(cfg.velMax, j.vel));
+  j.dist += j.vel * DT;
+  j.tempo += DT;
+  j.trocando -= DT;
+
+  const passoVisual = DT / TEMPO_TROCA;
+  if (Math.abs(j.faixa - j.faixaVisual) <= passoVisual) j.faixaVisual = j.faixa;
+  else j.faixaVisual += Math.sign(j.faixa - j.faixaVisual) * passoVisual;
+
+  for (const c of j.moedas) {
+    if (!c.pegou && c.faixa === j.faixa && c.pos > j.dist - 0.5 && c.pos < j.dist + CARRO.comp + 0.5) { c.pegou = true; j.pegas++; evento("moeda"); }
+  }
+  for (const o of j.obst) {
+    const d = o.pos - j.dist;
+    if (o.tipo === "ciclista" && d > -20 && d < 60) o.pos += 2.5 * DT;   // ciclista sobe devagar
+    if (bateu(o)) return terminar("bateu", o.tipo);
+    if (!o.passou && o.pos + TAM_OBST[o.tipo].comp / 2 < j.dist) {        // passou raspando logo depois de trocar de faixa?
+      o.passou = true;
+      if (Math.abs(o.faixa - j.faixa) === 1 && j.tempo - j.ultimaTroca < 1) { j.quase++; evento("quase"); }
+    }
+  }
+  if (j.dist >= cfg.meta) return terminar("chegou");
+  if (j.tempo >= cfg.tempoLimite) return terminar("fechou");
+}
+
+// =====================================================================
+//  DESENHO 3D (projeção em perspectiva, como nos jogos de corrida antigos)
+// =====================================================================
+
+// O traçado da Serra: curvas para os lados e subida constante.
+function estradaX(m) { return 22 * Math.sin(m / 75) + 9 * Math.sin(m / 31 + 1.3); }
+function estradaY(m) { return 0.16 * m + 5 * Math.sin(m / 55); }
+
+function camera() {
+  const lateral = (jogo.faixaVisual - 1) * FAIXA_M;
+  return { z0: jogo.dist - CAM_ATRAS,
+           x: estradaX(jogo.dist) + lateral * 0.75,
+           y: estradaY(jogo.dist) + CAM_ALTURA };
+}
+
+// Transforma um ponto do mundo (metros) em um ponto da tela (pixels).
+let focoAtual = FOCO;
+function projetar(cam, xm, ym, m) {
+  const s = focoAtual / (m - cam.z0);
+  return { x: LARG / 2 + (xm - cam.x) * s, y: HORIZONTE - (ym - cam.y) * s, s };
+}
+
+// Quanto da cor some na névoa (0 = nítido, 1 = sumiu).
+function nevoa(m) {
+  const z = Math.max(0, m - jogo.dist);
+  let f = Math.max(0, Math.min(0.5, (z - 90) / 200));
+  if (naNeblina(m) || naNeblina(jogo.dist)) f = Math.max(f, Math.min(0.97, 0.3 + 0.67 * z / VISAO_NEBLINA));
+  return f;
+}
+const COR_NEVOA = [222, 230, 236];
+function cor(rgb, f) {
+  return "rgb(" + Math.round(rgb[0] + (COR_NEVOA[0] - rgb[0]) * f) + "," +
+                  Math.round(rgb[1] + (COR_NEVOA[1] - rgb[1]) * f) + "," +
+                  Math.round(rgb[2] + (COR_NEVOA[2] - rgb[2]) * f) + ")";
+}
+const PALETA = {
+  grama: [[96, 156, 62], [82, 138, 52]],
+  zebra: [[214, 40, 40], [242, 242, 242]],
+  asfalto: [[94, 98, 106], [87, 91, 99]],
+  linha: [245, 244, 232],
+  rocha: [[120, 108, 96], [108, 97, 86]],
+  musgo: [74, 110, 58],
+  trilho: [190, 196, 204],
+  barranco: [[128, 98, 72], [112, 86, 64]],
+};
+
+function par(n) { return ((Math.floor(n) % 2) + 2) % 2 === 0; }
+function acaso(k) { const v = Math.sin(k * 12.9898) * 43758.5453; return v - Math.floor(v); }
+
+// --- formas básicas ---
+function elipse(x, y, rx, ry) { ctx.beginPath(); ctx.ellipse(x, y, Math.max(0.1, rx), Math.max(0.1, ry), 0, 0, Math.PI * 2); ctx.fill(); }
+function retArred(x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath(); ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath(); ctx.fill();
+}
+function trapezio(x1, y1, w1, x2, y2, w2, preenchimento) {
+  ctx.fillStyle = preenchimento; ctx.beginPath();
+  ctx.moveTo(x1 - w1, y1 + 1); ctx.lineTo(x2 - w2, y2); ctx.lineTo(x2 + w2, y2); ctx.lineTo(x1 + w1, y1 + 1);
+  ctx.closePath(); ctx.fill();
+}
+function sombra(x, y, rx, ry) { ctx.fillStyle = "rgba(0,0,0,0.32)"; elipse(x, y, rx, ry); }
+
+// --- céu, sol, nuvens e montanhas ---
+function ruido(u) { return Math.sin(u / 90) * 0.5 + Math.sin(u / 37 + 2) * 0.3 + Math.sin(u / 17 + 5) * 0.2; }
+
+function desenharCeu() {
+  const g = ctx.createLinearGradient(0, 0, 0, HORIZONTE + 30);
+  g.addColorStop(0, "#2a7fcf"); g.addColorStop(0.7, "#8cc8ee"); g.addColorStop(1, "#d6eefa");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, LARG, ALT);
+
+  const desloc = estradaX(jogo.dist) * 6;
+  // sol
+  const sol = ctx.createRadialGradient(640, 70, 5, 640, 70, 90);
+  sol.addColorStop(0, "rgba(255,250,220,1)"); sol.addColorStop(0.25, "rgba(255,240,170,0.9)"); sol.addColorStop(1, "rgba(255,240,170,0)");
+  ctx.fillStyle = sol; ctx.fillRect(540, 0, 200, 170);
+  // nuvens
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  for (let i = 0; i < 6; i++) {
+    const largura = LARG + 300;
+    const x = (((i * 233 - desloc * 0.3 - relogio * 6) % largura) + largura) % largura - 150;
+    const y = 40 + (i % 3) * 38;
+    elipse(x, y, 46, 14); elipse(x + 28, y - 9, 30, 15); elipse(x - 26, y - 5, 26, 11);
+  }
+  // montanhas (duas camadas, a de trás anda mais devagar)
+  const camadas = [
+    { base: HORIZONTE + 20, alt: 105, var: 55, par: 0.4, cor: "#7f9fbe" },
+    { base: HORIZONTE + 20, alt: 55, var: 32, par: 1.0, cor: "#4d7f4f" },
+  ];
+  for (const c of camadas) {
+    ctx.fillStyle = c.cor; ctx.beginPath(); ctx.moveTo(0, ALT);
+    for (let x = 0; x <= LARG; x += 8) ctx.lineTo(x, c.base - (c.alt + c.var * ruido(x + desloc * c.par)));
+    ctx.lineTo(LARG, ALT); ctx.closePath(); ctx.fill();
+  }
+  // o vale lá embaixo (aparece do lado da pirambeira)
+  const gv = ctx.createLinearGradient(0, HORIZONTE + 8, 0, ALT);
+  gv.addColorStop(0, "#b9cbc6"); gv.addColorStop(0.25, "#86a684"); gv.addColorStop(0.6, "#4f7a4a"); gv.addColorStop(1, "#2f5530");
+  ctx.fillStyle = gv; ctx.fillRect(0, HORIZONTE + 8, LARG, ALT);
+  const volta = LARG + 260;
+  for (let fila = 0; fila < 7; fila++) {               // plantações e matas
+    const y = HORIZONTE + 14 + fila * fila * 3 + fila * 5, h = 2 + fila * 1.4;
+    for (let i = 0; i < 16; i++) {
+      const x = (((i * 97 + fila * 41 - desloc * (0.6 + fila * 0.3)) % volta) + volta) % volta - 130;
+      const t = acaso(i * 7 + fila * 31);
+      ctx.fillStyle = t < 0.33 ? "rgba(168,180,90,0.45)" : t < 0.66 ? "rgba(40,85,40,0.5)" : "rgba(180,155,100,0.4)";
+      ctx.fillRect(x, y, 18 + fila * 7, h);
+    }
+  }
+  ctx.strokeStyle = "rgba(130,180,210,0.85)"; ctx.lineCap = "round";   // rio
+  for (let i = 0; i < 24; i++) {
+    const t1 = i / 24, t2 = (i + 1) / 24;
+    const y1 = HORIZONTE + 10 + t1 * t1 * 110, y2 = HORIZONTE + 10 + t2 * t2 * 110;
+    const xr = t => 640 - desloc * (0.6 + t) + Math.sin(t * 9) * (15 + t * 50);
+    ctx.lineWidth = 1 + t1 * 5;
+    ctx.beginPath(); ctx.moveTo(xr(t1), y1); ctx.lineTo(xr(t2), y2); ctx.stroke();
+  }
+  ctx.lineCap = "butt";
+  ctx.fillStyle = "rgba(200,215,225,0.35)"; ctx.fillRect(0, HORIZONTE + 8, LARG, 14);  // névoa do vale
+}
+
+// --- a estrada, fatia por fatia, de longe para perto ---
+function desenharEstrada(cam) {
+  const pontos = [];
+  const inicio = Math.ceil((cam.z0 + 1) / PASSO_SEG) * PASSO_SEG;
+  for (let m = inicio; m <= cam.z0 + DESENHO_LONGE; m += PASSO_SEG) {
+    const p = projetar(cam, estradaX(m), estradaY(m), m);
+    p.m = m;
+    pontos.push(p);
+  }
+  for (let i = pontos.length - 2; i >= 0; i--) {
+    const perto = pontos[i], longe = pontos[i + 1];
+    if (perto.y <= longe.y) continue;
+    const f = nevoa(longe.m);
+    const listra = par(longe.m / 6) ? 0 : 1;
+    // chão do lado da montanha, até a beira da pirambeira
+    const pb = perto.x + 8.6 * perto.s, lb = longe.x + 8.6 * longe.s;
+    ctx.fillStyle = cor(PALETA.grama[listra], f);
+    ctx.beginPath(); ctx.moveTo(-10, perto.y + 1); ctx.lineTo(-10, longe.y); ctx.lineTo(lb, longe.y); ctx.lineTo(pb, perto.y + 1);
+    ctx.closePath(); ctx.fill();
+    // a pirambeira: barranco de pedra e terra despencando pro vale
+    const gb = ctx.createLinearGradient(0, longe.y, 0, longe.y + 70 * longe.s);
+    gb.addColorStop(0, cor(PALETA.barranco[listra], f)); gb.addColorStop(1, cor([45, 38, 32], Math.max(f, 0.35)));
+    ctx.fillStyle = gb; ctx.beginPath();
+    ctx.moveTo(pb, perto.y); ctx.lineTo(lb, longe.y);
+    ctx.lineTo(lb + 30 * longe.s, longe.y + 140 * longe.s); ctx.lineTo(pb + 30 * perto.s, perto.y + 140 * perto.s);
+    ctx.closePath(); ctx.fill();
+    trapezio(perto.x, perto.y, MEIA_ESTRADA * 1.13 * perto.s, longe.x, longe.y, MEIA_ESTRADA * 1.13 * longe.s,
+             cor(PALETA.zebra[par(longe.m / 3) ? 0 : 1], f));
+    trapezio(perto.x, perto.y, MEIA_ESTRADA * perto.s, longe.x, longe.y, MEIA_ESTRADA * longe.s,
+             cor(PALETA.asfalto[listra], f));
+    const branco = cor(PALETA.linha, f);
+    for (const lado of [-1, 1]) {   // linhas da borda
+      trapezio(perto.x + lado * 5.6 * perto.s, perto.y, 0.12 * perto.s, longe.x + lado * 5.6 * longe.s, longe.y, 0.12 * longe.s, branco);
+    }
+    // paredão de pedra do lado esquerdo (a montanha)
+    const pe = perto.x - 8 * perto.s, le = longe.x - 8 * longe.s;
+    ctx.fillStyle = cor(PALETA.rocha[par(longe.m / 4) ? 0 : 1], f);
+    ctx.beginPath(); ctx.moveTo(pe, perto.y + 1); ctx.lineTo(le, longe.y);
+    ctx.lineTo(le, longe.y - 22 * longe.s); ctx.lineTo(pe, perto.y - 22 * perto.s); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = cor(PALETA.musgo, f);
+    ctx.beginPath(); ctx.moveTo(pe, perto.y - 21 * perto.s); ctx.lineTo(le, longe.y - 21 * longe.s);
+    ctx.lineTo(le, longe.y - 22 * longe.s); ctx.lineTo(pe, perto.y - 22 * perto.s); ctx.closePath(); ctx.fill();
+    // guard-rail do lado direito (o precipício)
+    const pd = perto.x + 7.6 * perto.s, ld = longe.x + 7.6 * longe.s;
+    ctx.fillStyle = cor(PALETA.trilho, f);
+    ctx.beginPath(); ctx.moveTo(pd, perto.y - 0.55 * perto.s); ctx.lineTo(ld, longe.y - 0.55 * longe.s);
+    ctx.lineTo(ld, longe.y - 0.85 * longe.s); ctx.lineTo(pd, perto.y - 0.85 * perto.s); ctx.closePath(); ctx.fill();
+    if (par(longe.m / 5)) {         // faixas tracejadas
+      for (const lado of [-1, 1]) {
+        trapezio(perto.x + lado * 2 * perto.s, perto.y, 0.13 * perto.s, longe.x + lado * 2 * longe.s, longe.y, 0.13 * longe.s, branco);
+      }
+    }
+  }
+}
+
+// --- objetos ---
+function desenharPedra(x, y, s) {
+  const w = 2.2 * s, h = 1.4 * s;
+  sombra(x, y, w * 0.58, h * 0.13);
+  ctx.save(); ctx.translate(x, y);
+  const g = ctx.createRadialGradient(-w * 0.15, -h * 0.75, h * 0.05, 0, -h * 0.4, w * 0.62);
+  g.addColorStop(0, "#d4cfc6"); g.addColorStop(0.55, "#8d877c"); g.addColorStop(1, "#4a463f");
+  ctx.fillStyle = g; ctx.beginPath();
+  ctx.moveTo(-w * 0.5, 0);
+  ctx.quadraticCurveTo(-w * 0.58, -h * 0.6, -w * 0.22, -h * 0.9);
+  ctx.quadraticCurveTo(w * 0.08, -h * 1.08, w * 0.36, -h * 0.76);
+  ctx.quadraticCurveTo(w * 0.6, -h * 0.42, w * 0.5, 0);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = "rgba(40,35,30,0.45)"; ctx.lineWidth = Math.max(1, s * 0.05);
+  ctx.beginPath(); ctx.moveTo(-w * 0.1, -h * 0.85); ctx.lineTo(0, -h * 0.5); ctx.lineTo(w * 0.15, -h * 0.35); ctx.stroke();
+  ctx.restore();
+}
+
+function desenharVaca(x, y, s) {
+  const L = 2.4 * s, H = 1.5 * s;
+  sombra(x, y, L * 0.55, H * 0.09);
+  ctx.save(); ctx.translate(x, y);
+  // pernas
+  for (const px of [-0.36, -0.24, 0.2, 0.32]) {
+    ctx.fillStyle = "#e6e6e6"; ctx.fillRect(px * L, -0.56 * H, 0.07 * L, 0.52 * H);
+    ctx.fillStyle = "#3a2a20"; ctx.fillRect(px * L, -0.06 * H, 0.07 * L, 0.06 * H);
+  }
+  // rabo
+  ctx.strokeStyle = "#ddd"; ctx.lineWidth = Math.max(1, 0.03 * L);
+  ctx.beginPath(); ctx.moveTo(-0.44 * L, -0.82 * H); ctx.quadraticCurveTo(-0.55 * L, -0.6 * H, -0.5 * L, -0.38 * H); ctx.stroke();
+  // corpo
+  const g = ctx.createLinearGradient(0, -0.95 * H, 0, -0.4 * H);
+  g.addColorStop(0, "#ffffff"); g.addColorStop(1, "#c9c9c9");
+  ctx.fillStyle = g; elipse(0, -0.68 * H, 0.46 * L, 0.26 * H);
+  ctx.fillStyle = "#1f1f1f";
+  elipse(-0.2 * L, -0.74 * H, 0.1 * L, 0.11 * H); elipse(0.12 * L, -0.62 * H, 0.08 * L, 0.09 * H); elipse(0.02 * L, -0.85 * H, 0.06 * L, 0.05 * H);
+  // cabeça
+  ctx.fillStyle = "#f4f4f4"; elipse(0.5 * L, -0.86 * H, 0.13 * L, 0.13 * H);
+  ctx.fillStyle = "#e7a9a0"; elipse(0.6 * L, -0.79 * H, 0.07 * L, 0.07 * H);
+  ctx.fillStyle = "#1f1f1f"; elipse(0.5 * L, -0.9 * H, 0.018 * L, 0.025 * H);
+  ctx.fillStyle = "#eadbb8"; ctx.fillRect(0.43 * L, -1.04 * H, 0.03 * L, 0.08 * H); ctx.fillRect(0.53 * L, -1.04 * H, 0.03 * L, 0.08 * H);
+  ctx.restore();
+}
+
+function desenharCiclista(x, y, s) {
+  sombra(x, y, 0.5 * s, 0.09 * s);
+  ctx.save(); ctx.translate(x, y);
+  const fase = Math.sin(relogio * 9);
+  ctx.fillStyle = "#1c1c1c"; retArred(-0.05 * s, -0.72 * s, 0.1 * s, 0.72 * s, 0.05 * s);          // roda
+  ctx.fillStyle = "#e9c4a0";                                                                        // pernas
+  ctx.fillRect(-0.17 * s, -1.02 * s, 0.11 * s, (0.5 + 0.1 * fase) * s);
+  ctx.fillRect(0.06 * s, -1.02 * s, 0.11 * s, (0.5 - 0.1 * fase) * s);
+  ctx.fillStyle = "#111"; retArred(-0.2 * s, -1.12 * s, 0.4 * s, 0.2 * s, 0.06 * s);                // bermuda
+  const g = ctx.createLinearGradient(-0.3 * s, 0, 0.3 * s, 0);
+  g.addColorStop(0, "#ff9a1f"); g.addColorStop(1, "#d96a00");
+  ctx.fillStyle = g; ctx.beginPath();                                                                 // camiseta
+  ctx.moveTo(-0.2 * s, -1.08 * s); ctx.lineTo(-0.27 * s, -1.6 * s); ctx.lineTo(0.27 * s, -1.6 * s); ctx.lineTo(0.2 * s, -1.08 * s);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.font = "bold " + Math.max(6, 0.22 * s) + "px Arial"; ctx.textAlign = "center";
+  ctx.fillText("7", 0, -1.28 * s);
+  ctx.fillStyle = "#e9c4a0"; ctx.fillRect(-0.33 * s, -1.55 * s, 0.08 * s, 0.4 * s); ctx.fillRect(0.25 * s, -1.55 * s, 0.08 * s, 0.4 * s);
+  ctx.fillStyle = "#ffd60a"; elipse(0, -1.74 * s, 0.17 * s, 0.15 * s);                                // capacete
+  ctx.restore();
+}
+
+function desenharArvore(x, y, s, tamanho) {
+  const H = 7 * tamanho * s, W = 2.8 * tamanho * s;
+  sombra(x, y, W * 0.4, W * 0.08);
+  ctx.fillStyle = "#5b3b22"; ctx.fillRect(x - W * 0.07, y - H * 0.25, W * 0.14, H * 0.25);
+  const tons = ["#1f5c33", "#277040", "#2f854c"];
+  for (let i = 0; i < 3; i++) {
+    const base = y - H * (0.18 + i * 0.25), topo = base - H * 0.42, larg = W * (0.5 - i * 0.11);
+    ctx.fillStyle = tons[i]; ctx.beginPath();
+    ctx.moveTo(x - larg, base); ctx.lineTo(x, topo); ctx.lineTo(x + larg, base); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0,0.18)"; ctx.beginPath();
+    ctx.moveTo(x, base); ctx.lineTo(x, topo); ctx.lineTo(x + larg, base); ctx.closePath(); ctx.fill();
+  }
+}
+
+function desenharBalizador(x, y, s) {
+  ctx.fillStyle = "#f2f2f2"; ctx.fillRect(x - 0.08 * s, y - 0.9 * s, 0.16 * s, 0.9 * s);
+  ctx.fillStyle = "#e63946"; ctx.fillRect(x - 0.08 * s, y - 0.8 * s, 0.16 * s, 0.15 * s);
+}
+
+function desenharPortal(x, y, s) {   // pórtico de chegada no mirante
+  ctx.fillStyle = "#333"; ctx.fillRect(x - 7.2 * s, y - 6 * s, 0.4 * s, 6 * s); ctx.fillRect(x + 6.8 * s, y - 6 * s, 0.4 * s, 6 * s);
+  const t = 14 / 12 * s;
+  for (let i = 0; i < 12; i++) for (let k = 0; k < 2; k++) {
+    ctx.fillStyle = (i + k) % 2 ? "#111" : "#fff";
+    ctx.fillRect(x - 7 * s + i * t, y - 6.2 * s + k * 0.6 * s, t, 0.6 * s);
+  }
+  ctx.fillStyle = "#ffd60a"; ctx.font = "bold " + Math.max(8, 0.9 * s) + "px Arial"; ctx.textAlign = "center";
+  ctx.fillText("MIRANTE", x, y - 6.5 * s);
+}
+
+// --- o carro, visto de trás ---
+function desenharCarro(x, y, s) {
+  const w = 2.0 * s, h = 1.35 * s;
+  const inclinacao = (jogo.faixa - jogo.faixaVisual) * 0.16;
+  y -= Math.abs(Math.sin(jogo.dist * 0.8)) * s * 0.02;
+  sombra(x, y, w * 0.64, h * 0.1);
+  ctx.save(); ctx.translate(x, y); ctx.rotate(inclinacao);
+  ctx.fillStyle = "#151515";                                    // pneus
+  retArred(-0.52 * w, -0.3 * h, 0.18 * w, 0.31 * h, 0.03 * w);
+  retArred(0.34 * w, -0.3 * h, 0.18 * w, 0.31 * h, 0.03 * w);
+  const carroceria = () => {
+    ctx.beginPath();
+    ctx.moveTo(-0.5 * w, -0.2 * h); ctx.lineTo(-0.5 * w, -0.58 * h);
+    ctx.lineTo(-0.44 * w, -0.64 * h); ctx.lineTo(-0.32 * w, -0.98 * h);
+    ctx.lineTo(0.32 * w, -0.98 * h); ctx.lineTo(0.44 * w, -0.64 * h);
+    ctx.lineTo(0.5 * w, -0.58 * h); ctx.lineTo(0.5 * w, -0.2 * h);
+    ctx.closePath();
+  };
+  ctx.fillStyle = cfg.cor; carroceria(); ctx.fill();
+  const luz = ctx.createLinearGradient(0, -h, 0, -0.2 * h);     // brilho e sombra na lataria
+  luz.addColorStop(0, "rgba(255,255,255,0.35)"); luz.addColorStop(0.45, "rgba(255,255,255,0)");
+  luz.addColorStop(0.55, "rgba(0,0,0,0)"); luz.addColorStop(1, "rgba(0,0,0,0.35)");
+  ctx.fillStyle = luz; carroceria(); ctx.fill();
+  const vidro = ctx.createLinearGradient(0, -0.94 * h, 0, -0.68 * h); // vidro traseiro
+  vidro.addColorStop(0, "#6f8fb0"); vidro.addColorStop(1, "#1c2a3a");
+  ctx.fillStyle = vidro; ctx.beginPath();
+  ctx.moveTo(-0.27 * w, -0.93 * h); ctx.lineTo(0.27 * w, -0.93 * h); ctx.lineTo(0.37 * w, -0.68 * h); ctx.lineTo(-0.37 * w, -0.68 * h);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.fillRect(-0.46 * w, -0.66 * h, 0.92 * w, 0.04 * h);   // aerofólio
+  ctx.save();                                                     // lanternas
+  if (jogo.freando) { ctx.shadowColor = "#ff2020"; ctx.shadowBlur = 0.4 * s; }
+  ctx.fillStyle = jogo.freando ? "#ff3b3b" : "#a51616";
+  retArred(-0.47 * w, -0.55 * h, 0.22 * w, 0.11 * h, 0.03 * w);
+  retArred(0.25 * w, -0.55 * h, 0.22 * w, 0.11 * h, 0.03 * w);
+  ctx.restore();
+  ctx.fillStyle = "#f5f5f5"; ctx.fillRect(-0.15 * w, -0.43 * h, 0.3 * w, 0.11 * h);              // placa
+  ctx.fillStyle = "#1d3557"; ctx.font = "bold " + Math.max(6, 0.075 * w) + "px Arial"; ctx.textAlign = "center";
+  ctx.fillText("SATC-26", 0, -0.35 * h);
+  ctx.fillStyle = "#222"; retArred(-0.49 * w, -0.27 * h, 0.98 * w, 0.08 * h, 0.03 * w);         // para-choque
+  ctx.fillStyle = "#555"; elipse(0.3 * w, -0.21 * h, 0.04 * w, 0.025 * h);                      // escapamento
+  ctx.restore();
+}
+
+function desenharMoeda(x, y, s) {
+  const r = 0.45 * s, giro = Math.max(0.15, Math.abs(Math.cos(relogio * 5)));
+  ctx.fillStyle = "rgba(0,0,0,0.2)"; elipse(x, y, r * 0.7, r * 0.15);
+  ctx.save();
+  ctx.shadowColor = "rgba(255,214,10,0.9)"; ctx.shadowBlur = Math.min(20, 0.6 * s);
+  ctx.fillStyle = "#d99a00"; elipse(x, y - 1.1 * s, r * giro, r);
+  ctx.restore();
+  ctx.fillStyle = "#ffd60a"; elipse(x, y - 1.1 * s, r * 0.78 * giro, r * 0.78);
+  ctx.fillStyle = "rgba(255,255,255,0.75)"; elipse(x - r * 0.2 * giro, y - 1.25 * s, r * 0.15 * giro, r * 0.25);
+}
+
+// --- junta tudo em profundidade: o mais longe é desenhado primeiro ---
+function desenharMundo(cam) {
+  const itens = [];
+  const longe = cam.z0 + DESENHO_LONGE;
+  for (let k = Math.ceil((cam.z0 + 1) / 10); k * 10 < longe; k++) {           // balizadores
+    itens.push({ m: k * 10, lat: 7.6, tipo: "baliza" });
+  }
+  for (let k = Math.ceil((cam.z0 + 1) / 9); k * 9 < longe; k++) {             // árvores
+    const r = acaso(k);
+    if (r < 0.4) continue;
+    itens.push({ m: k * 9, lat: -(9.5 + r * 8), alt: 22, tipo: "arvore", tam: 0.75 + r * 0.6 });   // árvores no alto do paredão
+  }
+  for (const o of jogo.obst) {
+    if (o.pos > cam.z0 + 1 && o.pos < longe) itens.push({ m: o.pos, lat: (o.faixa - 1) * FAIXA_M, tipo: o.tipo });
+  }
+  for (const c of jogo.moedas) {
+    if (!c.pegou && c.pos > cam.z0 + 1 && c.pos < longe) itens.push({ m: c.pos, lat: (c.faixa - 1) * FAIXA_M, tipo: "moeda" });
+  }
+  if (cfg.meta > cam.z0 + 1 && cfg.meta < longe) itens.push({ m: cfg.meta, lat: 0, tipo: "portal" });
+  itens.push({ m: jogo.dist, lat: (jogo.faixaVisual - 1) * FAIXA_M, tipo: "carro" });
+
+  itens.sort((a, b) => b.m - a.m);
+  for (const it of itens) {
+    const p = projetar(cam, estradaX(it.m) + it.lat, estradaY(it.m) + (it.alt || 0), it.m);
+    if (p.x < -300 || p.x > LARG + 300) continue;
+    ctx.globalAlpha = it.tipo === "carro" ? 1 : Math.max(0, 1 - nevoa(it.m));
+    if (ctx.globalAlpha <= 0.02) continue;
+    switch (it.tipo) {
+      case "pedra": desenharPedra(p.x, p.y, p.s); break;
+      case "vaca": desenharVaca(p.x, p.y, p.s); break;
+      case "ciclista": desenharCiclista(p.x, p.y, p.s); break;
+      case "arvore": desenharArvore(p.x, p.y, p.s, it.tam); break;
+      case "baliza": desenharBalizador(p.x, p.y, p.s); break;
+      case "portal": desenharPortal(p.x, p.y, p.s); break;
+      case "moeda": desenharMoeda(p.x, p.y, p.s); break;
+      case "carro": desenharCarro(p.x, p.y, p.s); carroTela = { x: p.x, y: p.y, s: p.s }; break;
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function desenharNeblinaTela() {
+  if (!naNeblina(jogo.dist)) return;
+  const g = ctx.createLinearGradient(0, 0, 0, ALT);
+  g.addColorStop(0, "rgba(225,232,238,0.96)"); g.addColorStop(0.5, "rgba(225,232,238,0.7)"); g.addColorStop(1, "rgba(225,232,238,0.1)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, LARG, ALT);
+}
+
+// --- painel ---
+function cartao(x, y, w, h) { ctx.fillStyle = "rgba(10,18,28,0.65)"; retArred(x, y, w, h, 12); }
+
+function desenharPainel() {
+  ctx.textAlign = "left";
+  cartao(12, 12, 250, 58);
+  ctx.fillStyle = "#fff"; ctx.font = "bold 17px 'Segoe UI', Arial";
+  ctx.fillText(cfg.equipe || "Sobe a Serra", 26, 36);
+  ctx.textAlign = "right"; ctx.font = "12px 'Segoe UI', Arial"; ctx.fillStyle = "#bfe3ff";
+  const modo = jogo.modo === "auto" ? "🤖 Automático" : jogo.modo === "manual" ? "🎮 Manual" : "";
+  ctx.fillText(modo, 250, 35);
+  ctx.textAlign = "left"; ctx.font = "bold 16px 'Segoe UI', Arial"; ctx.fillStyle = "#ffd60a";
+  ctx.fillText("🪙 " + jogo.pegas + "     ⭐ " + (jogo.fim ? jogo.pontos : calcularPontos(jogo)) + " pts", 26, 60);
+
+  const px = 290, pw = 220, prog = Math.min(1, jogo.dist / cfg.meta);
+  cartao(px - 12, 12, pw + 24, 58);
+  ctx.textAlign = "center"; ctx.fillStyle = "#fff"; ctx.font = "bold 14px 'Segoe UI', Arial";
+  ctx.fillText("Curva " + Math.min(TOTAL_CURVAS, Math.floor(prog * TOTAL_CURVAS)) + " de " + TOTAL_CURVAS +
+               "  ·  " + Math.floor(jogo.dist) + " m", px + pw / 2, 34);
+  ctx.fillStyle = "rgba(255,255,255,0.18)"; retArred(px, 44, pw, 12, 6);
+  const gp = ctx.createLinearGradient(px, 0, px + pw, 0);
+  gp.addColorStop(0, "#ffd60a"); gp.addColorStop(1, "#f77f00");
+  ctx.fillStyle = gp; retArred(px, 44, Math.max(12, pw * prog), 12, 6);
+
+  const resta = Math.max(0, Math.ceil(cfg.tempoLimite - jogo.tempo));
+  cartao(LARG - 172, 12, 160, 58);
+  ctx.fillStyle = resta <= 20 ? "#ff6b6b" : "#fff"; ctx.font = "bold 24px 'Segoe UI', Arial";
+  ctx.fillText("⏱ " + resta + " s", LARG - 92, 42);
+  ctx.fillStyle = "#bfe3ff"; ctx.font = "11px 'Segoe UI', Arial";
+  ctx.fillText("até a Serra fechar", LARG - 92, 60);
+
+  // velocímetro
+  const cx = LARG - 72, cy = ALT - 66, r = 44, kmh = jogo.vel * 3.6;
+  ctx.fillStyle = "rgba(10,18,28,0.7)"; elipse(cx, cy, r + 12, r + 12);
+  ctx.lineWidth = 8; ctx.lineCap = "round";
+  ctx.strokeStyle = "rgba(255,255,255,0.15)"; ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI * 0.75, Math.PI * 2.25); ctx.stroke();
+  const frac = Math.min(1, kmh / 140);
+  ctx.strokeStyle = frac > 0.7 ? "#ff6b6b" : frac > 0.45 ? "#ffd60a" : "#4cd3a5";
+  ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI * 0.75, Math.PI * (0.75 + 1.5 * frac)); ctx.stroke();
+  ctx.lineCap = "butt";
+  ctx.fillStyle = "#fff"; ctx.font = "bold 24px 'Segoe UI', Arial"; ctx.fillText(Math.round(kmh), cx, cy + 6);
+  ctx.font = "11px 'Segoe UI', Arial"; ctx.fillStyle = "#bfe3ff"; ctx.fillText("km/h", cx, cy + 22);
+
+  if (neblinaPerto() && !jogo.fim) {
+    cartao(LARG / 2 - 75, 82, 150, 32);
+    ctx.fillStyle = "#fff"; ctx.font = "bold 15px 'Segoe UI', Arial"; ctx.fillText("🌫️ NEBLINA", LARG / 2, 104);
+  }
+}
+
+function escrever(texto, x, y, largMax, alturaLinha) {
+  const palavras = String(texto).split(" ");
+  let linha = "";
+  for (const p of palavras) {
+    const teste = linha ? linha + " " + p : p;
+    if (ctx.measureText(teste).width > largMax && linha) { ctx.fillText(linha, x, y); linha = p; y += alturaLinha; }
+    else linha = teste;
+  }
+  ctx.fillText(linha, x, y);
+  return y + alturaLinha;
+}
+
+function caixa() {
+  ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(0, 0, LARG, ALT);
+  ctx.fillStyle = "rgba(10,18,28,0.88)"; retArred(LARG / 2 - 230, 110, 460, 280, 18);
+  ctx.textAlign = "center"; ctx.fillStyle = "#fff";
+}
+
+function desenharInicio() {
+  caixa();
+  ctx.font = "bold 34px 'Segoe UI', Arial"; ctx.fillText("⛰️ SOBE A SERRA", LARG / 2, 165);
+  ctx.font = "16px 'Segoe UI', Arial";
+  let y = escrever("São " + TOTAL_CURVAS + " curvas até o mirante. Chegue antes de a Serra fechar!", LARG / 2, 205, 400, 22);
+  y = escrever("🎮 ← → ou A D muda de faixa  ·  ↓ ou S freia", LARG / 2, y + 8, 400, 22);
+  y = escrever("🤖 Ou programe o piloto automático no código.", LARG / 2, y, 400, 22);
+  ctx.font = "14px 'Segoe UI', Arial"; ctx.fillStyle = "#bfe3ff";
+  y = escrever("Cuidado com pedras, vacas, ciclistas e neblina.", LARG / 2, y + 8, 400, 20);
+  ctx.fillStyle = "#ffd60a"; ctx.font = "bold 14px 'Segoe UI', Arial";
+  y = escrever("🪙 Pegue moedas e passe raspando pra subir no 🏆 Ranking!", LARG / 2, y + 2, 400, 20);
+  if (erroDeDigitacao) {
+    ctx.fillStyle = "#ff8080"; ctx.font = "bold 14px 'Segoe UI', Arial";
+    escrever("⚠️ Erro no código: " + erroDeDigitacao, LARG / 2, y + 8, 400, 20);
+  }
+}
+
+function desenharFim() {
+  caixa();
+  const f = jogo.fim;
+  const titulos = { chegou: "🏁 Chegou ao mirante!", bateu: "💥 Bateu!", fechou: "⛔ A Serra fechou!", erro: "⚠️ Erro no piloto" };
+  ctx.font = "900 32px 'Segoe UI', Arial"; ctx.fillText(titulos[f.tipo], LARG / 2, 162);
+  ctx.font = "16px 'Segoe UI', Arial"; ctx.fillStyle = "#cfe3f5";
+  const tempo = jogo.tempo.toFixed(1).replace(".", ",");
+  if (f.tipo === "erro") {
+    ctx.fillStyle = "#ff8080";
+    escrever(f.info, LARG / 2, 210, 400, 22);
+  } else {
+    let linha = "";
+    if (f.tipo === "chegou") linha = "Tempo: " + tempo + " s";
+    else if (f.tipo === "bateu") linha = "Bateu: " + NOMES[f.info] + " · " + Math.floor(jogo.dist) + " m de " + cfg.meta;
+    else linha = "Chegou a " + Math.floor(jogo.dist) + " m de " + cfg.meta + " · freou demais?";
+    ctx.fillText(linha, LARG / 2, 196);
+    ctx.fillStyle = "#ffd60a"; ctx.font = "900 44px 'Segoe UI', Arial";
+    ctx.fillText("⭐ " + jogo.pontos + " pts", LARG / 2, 258);
+    ctx.fillStyle = "#cfe3f5"; ctx.font = "14px 'Segoe UI', Arial";
+    ctx.fillText("🪙 " + jogo.pegas + " moedas  ·  ✨ " + jogo.quase + " quase  ·  " +
+                 (f.tipo === "chegou" ? "🏁 bônus de chegada" : "📏 distância"), LARG / 2, 288);
+    if (jogo.posicao) {
+      ctx.fillStyle = jogo.posicao <= 3 ? "#ffd60a" : "#fff"; ctx.font = "bold 19px 'Segoe UI', Arial";
+      const medalha = ["🥇", "🥈", "🥉"][jogo.posicao - 1] || "🏆";
+      ctx.fillText(medalha + " " + jogo.posicao + "º lugar no ranking", LARG / 2, 326);
+    }
+  }
+  ctx.fillStyle = "#8fa3b8"; ctx.font = "14px 'Segoe UI', Arial";
+  ctx.fillText("Aperte R ou clique num botão pra tentar de novo", LARG / 2, 368);
+}
+
+function desenharRanking() {
+  ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.fillRect(0, 0, LARG, ALT);
+  ctx.fillStyle = "rgba(10,18,28,0.94)"; retArred(LARG / 2 - 280, 34, 560, 432, 18);
+  ctx.textAlign = "center"; ctx.fillStyle = "#ffd60a"; ctx.font = "900 30px 'Segoe UI', Arial";
+  ctx.fillText("🏆 RANKING", LARG / 2, 78);
+  ctx.fillStyle = "#bfe3ff"; ctx.font = "13px 'Segoe UI', Arial";
+  ctx.fillText("Estrada " + cfg.semente + " · resultados deste computador", LARG / 2, 100);
+  const lista = rankingDaEstrada().slice(0, 10);
+  if (!lista.length) {
+    ctx.fillStyle = "#fff"; ctx.font = "17px 'Segoe UI', Arial";
+    ctx.fillText("Ninguém jogou ainda. Seja o primeiro!", LARG / 2, 250);
+  }
+  lista.forEach((x, i) => {
+    const y = 136 + i * 29;
+    if (x.id === ultimoId) { ctx.fillStyle = "rgba(255,214,10,0.18)"; retArred(LARG / 2 - 262, y - 20, 524, 27, 8); }
+    ctx.textAlign = "left"; ctx.fillStyle = "#fff"; ctx.font = "bold 16px 'Segoe UI', Arial";
+    ctx.fillText(["🥇", "🥈", "🥉"][i] || (i + 1) + "º", LARG / 2 - 248, y);
+    ctx.fillText((x.modo === "auto" ? "🤖 " : "🎮 ") + x.nome, LARG / 2 - 200, y);
+    ctx.textAlign = "right"; ctx.fillStyle = "#bfe3ff"; ctx.font = "14px 'Segoe UI', Arial";
+    ctx.fillText(x.chegou ? "🏁 " + x.tempo.toFixed(1).replace(".", ",") + " s" : "💥 " + x.dist + " m", LARG / 2 + 130, y);
+    ctx.fillStyle = "#ffd60a"; ctx.font = "bold 17px 'Segoe UI', Arial";
+    ctx.fillText(x.pontos + " pts", LARG / 2 + 250, y);
+  });
+  ctx.textAlign = "center"; ctx.fillStyle = "#8fa3b8"; ctx.font = "12px 'Segoe UI', Arial";
+  ctx.fillText("Clique em 🏆 Ranking pra fechar  ·  tecla L apaga o ranking deste computador", LARG / 2, 452);
+}
+
+// Plaquinha em cima do carro com o comando que o piloto está mandando
+function desenharComandoNoCarro() {
+  if (jogo.modo !== "auto" || jogo.fim) return;
+  // mostra o último comando de ação por meio segundo, pra dar tempo de ler
+  const c = /esquerda|direita|frear/i.test(jogo.comando) ? jogo.comando.toLowerCase()
+          : jogo.ultimaAcao && jogo.tempo - jogo.ultimaAcao.t < 0.6 ? jogo.ultimaAcao.cmd.toLowerCase() : "";
+  const rotulo = c.includes("esquerda") ? "⬅ esquerda" : c.includes("direita") ? "direita ➡" : c.includes("frear") ? "🛑 frear" : "";
+  if (!rotulo) return;
+  ctx.font = "bold 15px 'Segoe UI', Arial"; ctx.textAlign = "center";
+  const w = ctx.measureText(rotulo).width + 18, x = carroTela.x, y = carroTela.y - carroTela.s * 2.1;
+  ctx.fillStyle = "rgba(10,18,28,0.8)"; retArred(x - w / 2, y - 18, w, 26, 13);
+  ctx.fillStyle = c.includes("frear") ? "#ff8080" : "#ffd60a"; ctx.fillText(rotulo, x, y);
+}
+
+function desenharPausa() {
+  ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.fillRect(0, 0, LARG, ALT);
+  ctx.fillStyle = "rgba(10,18,28,0.88)"; retArred(LARG / 2 - 170, ALT / 2 - 70, 340, 130, 18);
+  ctx.textAlign = "center"; ctx.fillStyle = "#fff"; ctx.font = "900 34px 'Segoe UI', Arial";
+  ctx.fillText("⏸ PAUSADO", LARG / 2, ALT / 2 - 12);
+  ctx.fillStyle = "#bfe3ff"; ctx.font = "14px 'Segoe UI', Arial";
+  ctx.fillText("Aperte P ou clique em ▶ Continuar", LARG / 2, ALT / 2 + 26);
+}
+
+function desenhar() {
+  const frac = Math.max(0, Math.min(1, (jogo.vel - 8) / 17));
+  focoAtual = FOCO * (1 - 0.14 * frac);                 // a visão "abre" quando acelera
+  const cam = camera();
+  ctx.save();
+  const balanco = tremor + (jogo.fim || jogo.modo === "espera" ? 0 : Math.max(0, frac - 0.6) * 3);
+  if (balanco > 0) ctx.translate((Math.random() - 0.5) * balanco, (Math.random() - 0.5) * balanco);
+  desenharCeu();
+  desenharEstrada(cam);
+  desenharMundo(cam);
+  desenharNeblinaTela();
+  desenharVento();
+  desenharEfeitos();
+  desenharComandoNoCarro();
+  ctx.restore();
+  desenharPainel();
+  if (mostrarRanking) desenharRanking();
+  else if (pausado && !jogo.fim) desenharPausa();
+  else if (jogo.fim && (jogo.fim.tipo === "erro" || relogio - (jogo.fimRelogio || 0) > 1)) desenharFim();
+  else if (jogo.modo === "espera") desenharInicio();
+}
+
+// ---------- Controles ----------
+// Setas ou WASD: A/← esquerda, D/→ direita, S/↓ freia
+function tecla(e) {
+  const k = e.key.toLowerCase();
+  if (k === "arrowleft" || k === "a" || e.code === "KeyA") return "esquerda";
+  if (k === "arrowright" || k === "d" || e.code === "KeyD") return "direita";
+  if (k === "arrowdown" || k === "s" || e.code === "KeyS") return "frear";
+  return null;
+}
+function digitando(e) { const t = e.target; return t && (t.tagName === "TEXTAREA" || t.tagName === "INPUT"); }
+document.addEventListener("keydown", e => {
+  if (digitando(e)) return;              // no editor, as teclas são do código, não do carro
+  if (["ArrowLeft", "ArrowRight", "ArrowDown", "ArrowUp", " "].includes(e.key)) e.preventDefault();
+  const t = tecla(e);
+  if (t === "esquerda" || t === "direita") teclas.pendente = t;
+  if (t === "frear") teclas.baixo = true;
+  if (e.key === "r" || e.key === "R") iniciar(ultimoModo);
+  if ((e.key === "l" || e.key === "L") && mostrarRanking) limparRanking();
+  if (e.key === "p" || e.key === "P" || e.key === " ") alternarPausa();
+});
+document.addEventListener("keyup", e => { if (!digitando(e) && tecla(e) === "frear") teclas.baixo = false; });
+tela.addEventListener("pointerdown", e => {
+  const r = tela.getBoundingClientRect();
+  teclas.pendente = (e.clientX - r.left) < r.width / 2 ? "esquerda" : "direita";
+});
+
+// ---------- Laço principal ----------
+let ultimo = performance.now();
+function quadro(agora) {
+  const dt = Math.min(0.1, (agora - ultimo) / 1000);
+  ultimo = agora;
+  relogio += dt;
+  if (jogo.modo !== "espera" && !jogo.fim && !mostrarRanking && !pausado) {
+    acumulado += dt * turbo;
+    while (acumulado >= DT && !jogo.fim) { passo(); acumulado -= DT; }
+  }
+  if (!pausado) atualizarEfeitos(dt);
+  atualizarMotor();
+  if (typeof atualizarDepuracao === "function") atualizarDepuracao();
+  desenhar();
+  requestAnimationFrame(quadro);
+}
+
+jogo = novoJogo("espera");
+atualizarBotaoJogar();
+setInterval(atualizarBotaoJogar, 15000);   // libera sozinho quando der o horário
+requestAnimationFrame(quadro);
+</script>
+
+<script>
+// =====================================================================
+//  EDITOR DO PILOTO (na direita da tela)
+// =====================================================================
+const editor = document.getElementById("editor");
+const realce = document.getElementById("realce");
+const numeros = document.getElementById("numeros");
+const statusEl = document.getElementById("status");
+const nomeDupla = document.getElementById("nomeDupla");
+const CHAVE_CODIGO = "sobeASerra.codigo.v4", CHAVE_NOME = "sobeASerra.nomePiloto";
+const EXEMPLO = typeof pilotoAutomatico === "function" ? pilotoAutomatico.toString()
+  : 'function pilotoAutomatico(controle, sensor) {\n  controle.acelerar();\n}';
+let linhaComErro = 0;
+
+// Deixa as mensagens de erro do navegador mais fáceis de entender
+function traduzirErro(msg) {
+  msg = String(msg).replace(/^Uncaught /, "").replace(/^.*Failed to execute 'appendChild' on 'Node': /, "")
+                   .replace(/^(SyntaxError|ReferenceError|TypeError): /, "");
+  const regras = [
+    [/^Unexpected end of input$/, "faltou fechar uma chave } ou um parêntese )"],
+    [/^missing \) after argument list$/, "faltou fechar um parêntese )"],
+    [/^Unexpected token '(.+)'$/, "o símbolo $1 está sobrando ou no lugar errado"],
+    [/^Unexpected identifier '?([^']*)'?$/, "a palavra $1 apareceu num lugar inesperado (faltou parêntese, vírgula ou aspas?)"],
+    [/^Unexpected string$/, "um texto entre aspas apareceu num lugar inesperado"],
+    [/^Invalid or unexpected token$/, "tem um caractere estranho (aspas sem fechar?)"],
+    [/^(.+) is not defined$/, "$1 não existe (erro de digitação no nome?)"],
+    [/^(.+) is not a function$/, "$1 não é uma função (o nome do sensor ou do comando está certo?)"],
+    [/^Cannot read properties of (undefined|null) \(reading '(.+)'\)$/, "tentou usar .$2 em algo que não existe"],
+  ];
+  for (const [re, texto] of regras) if (re.test(msg)) return msg.replace(re, texto);
+  return msg;
+}
+
+function guardar(chave, valor) { try { localStorage.setItem(chave, valor); } catch (e) {} }
+function ler(chave) { try { return localStorage.getItem(chave); } catch (e) { return null; } }
+
+// --- cores do código ---
+function escapar(t) { return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function realcar(cod) {
+  const re = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/)|("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*')|\b(function|return|if|else|const|let|var|for|of|while|true|false|null|Infinity|break|continue)\b|\b(\d+(?:\.\d+)?|ESQUERDA|MEIO|DIREITA|NENHUMA)\b|\b((?:sensor|controle)\.\w+)/g;
+  let saida = "", ultimo = 0, m;
+  while ((m = re.exec(cod))) {
+    saida += escapar(cod.slice(ultimo, m.index));
+    const classe = m[1] ? "c" : m[2] ? "t" : m[3] ? "k" : m[4] ? "n" : "s";
+    saida += '<span class="' + classe + '">' + escapar(m[0]) + "</span>";
+    ultimo = re.lastIndex;
+  }
+  return saida + escapar(cod.slice(ultimo)) + "\n";
+}
+function atualizarEditor() {
+  realce.innerHTML = realcar(editor.value);
+  const total = editor.value.split("\n").length;
+  let n = "";
+  for (let i = 1; i <= total; i++) n += (i === linhaComErro ? '<span class="erro">' + i + "</span>" : i) + "\n";
+  numeros.innerHTML = n;
+  sincronizarRolagem();
+}
+function sincronizarRolagem() {
+  realce.scrollTop = editor.scrollTop; realce.scrollLeft = editor.scrollLeft;
+  numeros.scrollTop = editor.scrollTop;
+}
+function mostrarStatus(texto, tipo) { statusEl.textContent = texto; statusEl.className = tipo || ""; }
+
+// --- transforma o texto do editor em função de verdade ---
+const LINHAS_ANTES = 1;   // a linha que o jogo coloca antes do código do aluno
+function linhaDoErro(err) {
+  const m = /piloto\.js:(\d+)/.exec((err && err.stack) || "");
+  const linha = m ? Math.max(1, +m[1] - LINHAS_ANTES) : 0;
+  if (linha) { linhaComErro = linha; atualizarEditor(); }
+  return linha;
+}
+function aplicarCodigo() {
+  guardar(CHAVE_CODIGO, editor.value);   // salva no navegador toda vez que testa
+  let erro = null;
+  const ouvinte = ev => {
+    erro = traduzirErro(ev.message);
+    const linha = ev.lineno ? Math.max(1, ev.lineno - LINHAS_ANTES) : 0;
+    if (linha) { erro = "linha " + linha + ": " + erro; linhaComErro = linha; }
+    ev.preventDefault();
+  };
+  window.__pilotoNovo = undefined;
+  window.addEventListener("error", ouvinte);
+  const el = document.createElement("script");
+  el.textContent = "window.__pilotoNovo = (function () {\n" + editor.value +
+    "\n;return typeof pilotoAutomatico === 'function' ? pilotoAutomatico : null;\n})();\n//# sourceURL=piloto.js";
+  document.body.appendChild(el);
+  el.remove();
+  window.removeEventListener("error", ouvinte);
+  if (erro) { atualizarEditor(); mostrarStatus("❌ Erro de digitação, " + erro, "erro"); return { ok: false, erro: "Erro de digitação, " + erro }; }
+  if (typeof window.__pilotoNovo !== "function") {
+    const msg = "Não achei a função pilotoAutomatico. Ela precisa começar com: function pilotoAutomatico(controle, sensor) {";
+    mostrarStatus("❌ " + msg, "erro"); return { ok: false, erro: msg };
+  }
+  pilotoAutomatico = window.__pilotoNovo;
+  linhaComErro = 0; atualizarEditor();
+  const agora = new Date();
+  mostrarStatus("✅ Piloto carregado às " + agora.toLocaleTimeString("pt-BR").slice(0, 5) + ". Boa corrida!", "ok");
+  return { ok: true };
+}
+function testarPiloto() { iniciar("auto"); }
+function restaurarExemplo() {
+  if (!confirm("Trocar o seu código pelo exemplo? O que vocês escreveram vai ser apagado.")) return;
+  editor.value = EXEMPLO; guardar(CHAVE_CODIGO, EXEMPLO); linhaComErro = 0; atualizarEditor();
+  mostrarStatus("Código de exemplo restaurado.");
+}
+
+// --- digitação confortável: Tab, Enter com recuo e Ctrl+Enter ---
+function inserir(texto) {
+  if (!document.execCommand("insertText", false, texto)) editor.setRangeText(texto, editor.selectionStart, editor.selectionEnd, "end");
+}
+editor.addEventListener("keydown", e => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); testarPiloto(); return; }
+  if (e.key === "Tab") { e.preventDefault(); inserir("  "); return; }
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const antes = editor.value.slice(0, editor.selectionStart);
+    const linha = antes.slice(antes.lastIndexOf("\n") + 1);
+    let recuo = (linha.match(/^\s*/) || [""])[0];
+    if (/[{(]\s*$/.test(linha)) recuo += "  ";
+    inserir("\n" + recuo);
+  }
+  if (e.key === "}") {      // fecha chave e desfaz o recuo extra
+    const antes = editor.value.slice(0, editor.selectionStart);
+    const linha = antes.slice(antes.lastIndexOf("\n") + 1);
+    if (/^\s{2,}$/.test(linha)) { e.preventDefault(); editor.setSelectionRange(editor.selectionStart - 2, editor.selectionStart); inserir("}"); }
+  }
+});
+editor.addEventListener("input", () => { linhaComErro = 0; atualizarEditor(); guardar(CHAVE_CODIGO, editor.value); });
+editor.addEventListener("scroll", sincronizarRolagem);
+
+// --- depuração: mostra o comando e os sensores enquanto o carro anda ---
+const dbgComando = document.getElementById("dbgComando");
+const dbgSensores = document.getElementById("dbgSensores");
+const dbgHistorico = document.getElementById("dbgHistorico");
+let ultimaDepuracao = 0;
+function numeroBonito(v) { return v >= NADA_A_VISTA ? "999" : String(Math.round(v)); }
+function atualizarDepuracao() {
+  const agora = performance.now();
+  if (agora - ultimaDepuracao < 100) return;       // 10 vezes por segundo já basta
+  ultimaDepuracao = agora;
+  if (jogo.modo !== "auto") { dbgComando.textContent = "—"; dbgSensores.textContent = "—"; dbgHistorico.textContent = ""; return; }
+  const s = montarSensores();
+  dbgComando.textContent = jogo.comando;
+  dbgSensores.textContent = "faixa=" + nomeDaFaixa(s.faixa) + "  obstáculo: " +
+    [0, 1, 2].map(f => nomeDaFaixa(f) + "=" + numeroBonito(s.distanciaObstaculo(f))).join(" ") +
+    "  moeda=" + nomeDaFaixa(s.faixaDaMoeda) + (s.neblina ? "  🌫️neblina" : "");
+  dbgHistorico.textContent = jogo.historico.slice(-4).reverse().join("\n");
+}
+
+// --- nome do piloto automático (vai pro ranking) ---
+nomeDupla.value = ler(CHAVE_NOME) || cfg.equipe;
+cfg.equipe = nomeDupla.value || cfg.equipe;
+nomeDupla.addEventListener("input", () => { cfg.equipe = nomeDupla.value.trim() || "Jarvis"; guardar(CHAVE_NOME, nomeDupla.value); });
+
+// --- altura do editor acompanha o jogo ---
+function ajustarAltura() {
+  const col = document.getElementById("colJogo");
+  for (const id of ["colCodigo", "colAjuda"]) {
+    const el = document.getElementById(id);
+    const lado = Math.abs(el.offsetTop - col.offsetTop) < 20;
+    el.style.height = lado ? Math.max(Math.min(600, innerHeight - 80), col.offsetHeight) + "px" : (id === "colAjuda" && el.classList.contains("fechada") ? "52px" : "480px");
+  }
+}
+
+// --- biblioteca de comandos: abrir/fechar e clicar pra inserir ---
+const CHAVE_AJUDA = "sobeASerra.ajudaFechada";
+function alternarAjuda(fechar) {
+  const col = document.getElementById("colAjuda");
+  const fechada = typeof fechar === "boolean" ? fechar : !col.classList.contains("fechada");
+  col.classList.toggle("fechada", fechada);
+  document.getElementById("area").classList.toggle("ajudaFechada", fechada);
+  guardar(CHAVE_AJUDA, fechada ? "1" : "0");
+  ajustarAltura(); setTimeout(ajustarAltura, 50);
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+}
+document.querySelectorAll("#colAjuda .item").forEach(item => {
+  item.addEventListener("click", () => {
+    editor.focus();
+    inserir(item.dataset.inserir);
+    editor.dispatchEvent(new Event("input"));
+  });
+});
+// sem preferência salva: em tela pequena começa recolhida, pra sobrar espaço pro jogo
+const ajudaSalva = ler(CHAVE_AJUDA);
+alternarAjuda(ajudaSalva === null ? window.innerWidth < 1600 : ajudaSalva === "1");
+window.addEventListener("resize", ajustarAltura);
+
+editor.value = ler(CHAVE_CODIGO) || EXEMPLO;
+atualizarEditor();
+ajustarAltura();
+setTimeout(ajustarAltura, 300);
+</script>
+</body>
+</html>
