@@ -35,24 +35,21 @@
                border: 1px solid #2a3b50; background: #0d1520; color: #fff; }
   #editorCaixa { flex: 1; min-height: 160px; display: flex; background: #0d1520; border: 1px solid #2a3b50;
                  border-radius: 10px; overflow: hidden; font: 15px/1.5 Consolas, "Courier New", monospace; }
-  #numeros { padding: 10px 8px 10px 6px; color: #4b6078; text-align: right; user-select: none; min-width: 26px;
+  #numeros { padding: 10px 8px 100px 6px; color: #4b6078; text-align: right; user-select: none; min-width: 26px;
              overflow: hidden; white-space: pre; background: #0a111a; }
   #numeros .erro { color: #fff; background: #c0392b; border-radius: 3px; padding: 0 2px; }
   #codigoArea { position: relative; flex: 1; }
   #realce, #editor { position: absolute; inset: 0; margin: 0; padding: 10px; font: inherit; white-space: pre;
                      tab-size: 2; border: 0; box-sizing: border-box; }
-  #realce { color: #d6e2ef; pointer-events: none; overflow: hidden; }
+  #realce { color: #d6e2ef; pointer-events: none; overflow: hidden; padding-bottom: 90px; padding-right: 90px; }
+  /* sobra de rolagem: o desenho colorido nunca "trava" antes da caixa de texto, mesmo se ela encolher */
   #editor { color: transparent; background: transparent; caret-color: #fff; resize: none; outline: none; overflow: auto; }
   #editor::selection { background: rgba(80,140,255,0.4); color: transparent; }
   #realce .c { color: #6f8c76; } #realce .t { color: #ffd479; } #realce .k { color: #ff7ab2; }
   #realce .n { color: #a5e85c; } #realce .s { color: #7fd1ff; }
-  #status { font: 15px "Segoe UI", Arial; padding: 7px 10px; border-radius: 8px; background: #13202f; color: #bfe3ff; min-height: 18px; }
+  #status { font: 14px/1.3 "Segoe UI", Arial; padding: 4px 10px; border-radius: 8px; background: #13202f; color: #bfe3ff;
+            flex: 0 0 64px; height: 64px; box-sizing: border-box; overflow-y: auto; display: flex; align-items: center; }
   #status.ok { background: #123326; color: #7ff0c0; } #status.erro { background: #3a1518; color: #ff9b9b; }
-  #depuracao { font: 14px "Segoe UI", Arial; background: #0d1520; border: 1px solid #2a3b50; border-radius: 8px;
-               padding: 7px 10px; color: #9fb0c3; display: flex; flex-direction: column; gap: 3px; }
-  #depuracao code { font: 14px Consolas, monospace; color: #7fd1ff; }
-  #dbgComando { font-size: 16px !important; color: #ffd60a !important; }
-  #dbgHistorico { font: 13px Consolas, monospace; color: #7d91a8; white-space: pre; max-height: 60px; overflow: hidden; }
   #colCodigo .acoes { display: flex; gap: 8px; }
   #colCodigo .acoes button { flex: 1; }
   #colCodigo .acoes small { font-weight: normal; opacity: 0.75; font-size: 12px; }
@@ -74,6 +71,15 @@
   .item:hover { background: rgba(127,209,255,0.14); }
   .item code { display: block; font: 15px Consolas, monospace; color: #7fd1ff; white-space: pre-wrap; }
   .item span { display: block; font-size: 14px; color: #b9c8d8; margin-top: 2px; }
+  .valor { margin-top: 5px; font: 13px/1.5 Consolas, monospace; color: #ffd60a; background: rgba(255,214,10,0.08);
+           border-radius: 6px; padding: 3px 7px; white-space: pre-wrap; }
+  .valor:empty { display: none; }
+  .valor b { color: #fff; }
+  .item.ativo { background: rgba(255,214,10,0.18); box-shadow: inset 0 0 0 2px #ffd60a; }
+  .item.ativo code::after { content: "  ◀ agora"; color: #ffd60a; font-size: 12px; }
+  .aoVivo { font-size: 13px; color: #8fa3b8; margin: 2px 0 6px; }
+  #dbgHistorico { font: 12px/1.45 Consolas, monospace; color: #8fa3b8; white-space: pre; margin-bottom: 6px; }
+  #dbgHistorico:empty { display: none; }
   .pontos div { font-size: 15px; margin: 3px 0; }
 
   #colCodigo { order: -1; }   /* editor do lado esquerdo do jogo */
@@ -120,11 +126,6 @@
     </div>
   </div>
   <div id="status">Edite a função e clique em ▶ Testar piloto.</div>
-  <div id="depuracao">
-    <div>🕹️ Comando agora: <code id="dbgComando">—</code></div>
-    <div>👀 Sensores: <code id="dbgSensores">—</code></div>
-    <div id="dbgHistorico"></div>
-  </div>
   <div class="acoes">
     <button onclick="testarPiloto()">▶ Testar piloto <small>Ctrl+Enter</small></button>
     <button class="sec" onclick="restaurarExemplo()" title="Volta o código de exemplo">↺ Exemplo</button>
@@ -138,27 +139,29 @@
     <p class="dicaAjuda">Clique num item pra colocar ele no código, onde está o cursor.</p>
 
     <h3>🕹️ Comandos (controle)</h3>
-    <div class="item" data-inserir="controle.paraEsquerda();"><code>controle.paraEsquerda()</code><span>muda para a faixa da esquerda</span></div>
-    <div class="item" data-inserir="controle.paraDireita();"><code>controle.paraDireita()</code><span>muda para a faixa da direita</span></div>
-    <div class="item" data-inserir="controle.frear();"><code>controle.frear()</code><span>diminui a velocidade</span></div>
-    <div class="item" data-inserir="controle.acelerar();"><code>controle.acelerar()</code><span>segue reto acelerando (é o padrão se não mandar nada)</span></div>
+    <div id="aoVivo" class="aoVivo">▶ Rode o piloto (▶ Testar) pra ver os valores ao vivo aqui.</div>
+    <div id="dbgHistorico"></div>
+    <div class="item" data-comando="paraEsquerda" data-inserir="controle.paraEsquerda();"><code>controle.paraEsquerda()</code><span>muda para a faixa da esquerda</span></div>
+    <div class="item" data-comando="paraDireita" data-inserir="controle.paraDireita();"><code>controle.paraDireita()</code><span>muda para a faixa da direita</span></div>
+    <div class="item" data-comando="frear" data-inserir="controle.frear();"><code>controle.frear()</code><span>diminui a velocidade</span></div>
+    <div class="item" data-comando="acelerar" data-inserir="controle.acelerar();"><code>controle.acelerar()</code><span>segue reto acelerando (é o padrão se não mandar nada)</span></div>
+
+    <h3>👀 Sensores (sensor)</h3>
+    <div class="item" data-inserir="sensor.faixa"><code>sensor.faixa</code><span>faixa atual: ESQUERDA, MEIO ou DIREITA</span><div class="valor" data-valor="faixa"></div></div>
+    <div class="item" data-inserir="sensor.distanciaObstaculo(sensor.faixa)"><code>sensor.distanciaObstaculo(faixa)</code><span>metros livres até o obstáculo nessa faixa. 999 = nada à vista, fora da estrada = 0</span><div class="valor" data-valor="distanciaObstaculo"></div></div>
+    <div class="item" data-inserir="sensor.oQueTem(sensor.faixa)"><code>sensor.oQueTem(faixa)</code><span>"pedra", "vaca", "ciclista", "nada" ou "fora"</span><div class="valor" data-valor="oQueTem"></div></div>
+    <div class="item" data-inserir="sensor.faixaDaMoeda"><code>sensor.faixaDaMoeda</code><span>faixa da moeda mais perto: ESQUERDA, MEIO, DIREITA ou NENHUMA</span><div class="valor" data-valor="faixaDaMoeda"></div></div>
+    <div class="item" data-inserir="sensor.distanciaMoeda(sensor.faixa)"><code>sensor.distanciaMoeda(faixa)</code><span>metros até a próxima moeda nessa faixa. 999 = nenhuma à vista</span><div class="valor" data-valor="distanciaMoeda"></div></div>
+    <div class="item" data-inserir="sensor.neblina"><code>sensor.neblina</code><span>true na neblina (aí você só enxerga 30 m)</span><div class="valor" data-valor="neblina"></div></div>
+    <div class="item" data-inserir="sensor.velocidade"><code>sensor.velocidade</code><span>velocidade em km/h</span><div class="valor" data-valor="velocidade"></div></div>
+    <div class="item" data-inserir="sensor.tempoRestante"><code>sensor.tempoRestante</code><span>segundos até a Serra fechar</span><div class="valor" data-valor="tempoRestante"></div></div>
+    <div class="item" data-inserir="sensor.faltaParaMirante"><code>sensor.faltaParaMirante</code><span>metros até a chegada</span><div class="valor" data-valor="faltaParaMirante"></div></div>
 
     <h3>🛣️ Faixas</h3>
     <div class="item" data-inserir="ESQUERDA"><code>ESQUERDA</code><span>faixa da esquerda (junto do paredão)</span></div>
     <div class="item" data-inserir="MEIO"><code>MEIO</code><span>faixa do meio</span></div>
     <div class="item" data-inserir="DIREITA"><code>DIREITA</code><span>faixa da direita (junto da pirambeira)</span></div>
     <div class="item" data-inserir="NENHUMA"><code>NENHUMA</code><span>quando não tem faixa, por exemplo nenhuma moeda à vista</span></div>
-
-    <h3>👀 Sensores (sensor)</h3>
-    <div class="item" data-inserir="sensor.faixa"><code>sensor.faixa</code><span>faixa atual: ESQUERDA, MEIO ou DIREITA</span></div>
-    <div class="item" data-inserir="sensor.distanciaObstaculo(sensor.faixa)"><code>sensor.distanciaObstaculo(faixa)</code><span>metros livres até o obstáculo nessa faixa. 999 = nada à vista, fora da estrada = 0</span></div>
-    <div class="item" data-inserir="sensor.oQueTem(sensor.faixa)"><code>sensor.oQueTem(f)</code><span>"pedra", "vaca", "ciclista", "nada" ou "fora"</span></div>
-    <div class="item" data-inserir="sensor.faixaDaMoeda"><code>sensor.faixaDaMoeda</code><span>faixa da moeda mais perto: ESQUERDA, MEIO, DIREITA ou NENHUMA</span></div>
-    <div class="item" data-inserir="sensor.distanciaMoeda(sensor.faixa)"><code>sensor.distanciaMoeda(f)</code><span>metros até a próxima moeda na faixa f</span></div>
-    <div class="item" data-inserir="sensor.neblina"><code>sensor.neblina</code><span>true na neblina (aí você só enxerga 30 m)</span></div>
-    <div class="item" data-inserir="sensor.velocidade"><code>sensor.velocidade</code><span>velocidade em km/h</span></div>
-    <div class="item" data-inserir="sensor.tempoRestante"><code>sensor.tempoRestante</code><span>segundos até a Serra fechar</span></div>
-    <div class="item" data-inserir="sensor.faltaParaMirante"><code>sensor.faltaParaMirante</code><span>metros até a chegada</span></div>
 
     <h3>🧩 Exemplos prontos</h3>
     <div class="item" data-inserir="if (sensor.neblina) {&#10;    controle.frear();&#10;  }"><code>if (sensor.neblina) {
@@ -245,38 +248,26 @@ const SEMENTE           = 2026;       // mesma semente = mesma estrada pra todo 
 
 function pilotoAutomatico(controle, sensor) {
 
-  // Espaço livre (em metros) em cada faixa
-  const espacoEsquerda = sensor.distanciaObstaculo(ESQUERDA);
-  const espacoMeio     = sensor.distanciaObstaculo(MEIO);
-  const espacoDireita  = sensor.distanciaObstaculo(DIREITA);
-  const espaco = [espacoEsquerda, espacoMeio, espacoDireita];
+  // 1. Olhe o sensor: quanto espaço livre tem na minha faixa?
+  const espacoAqui = sensor.distanciaObstaculo(sensor.faixa);
 
-  // Qual faixa tem MAIS espaço?
-  let melhor = sensor.faixa;
-  if (espacoEsquerda > espaco[melhor]) melhor = ESQUERDA;
-  if (espacoMeio     > espaco[melhor]) melhor = MEIO;
-  if (espacoDireita  > espaco[melhor]) melhor = DIREITA;
-
-  // Obstáculo perto? Vai pra melhor faixa
-  if (espaco[sensor.faixa] < 25) {
-    if (melhor < sensor.faixa) {
-      controle.paraEsquerda();
-    }
-    if (melhor > sensor.faixa) {
-      controle.paraDireita();
-    }
+  // 2. Decida: tem obstáculo perto?
+  if (espacoAqui < 20) {
+    // 3. Mande um comando pro carro
+    controle.paraEsquerda();
   }
+
+  // Se não mandar nenhum comando, o carro segue reto acelerando.
 }
 
-// IDEIAS PARA MELHORAR O PILOTO:
-//  1. Indo da faixa 0 pra 2, o carro passa pela 1. E se tiver algo perto
-//     no meio do caminho? (dica: se faixa1 for pequeno, melhor controle.frear())
-//  2. Ele só reage quando o obstáculo está a 25 m. Testem outros valores!
-//  3. Na neblina vocês enxergam bem menos. Que tal frear quando sensor.neblina for true?
-//  4. Ciclista anda devagar: dá pra tratar diferente de uma pedra (sensor.oQueTem).
-//  5. Testem outra SEMENTE: um bom piloto funciona em qualquer estrada!
-//  6. Moedas dão pontos! Descubram onde está a próxima (sensor.faixaDaMoeda)
-//     e vão buscar quando o caminho estiver livre: sensor.distanciaObstaculo(...) > 40
+// DESAFIOS PARA MELHORAR O PILOTO (vejam a 📖 Biblioteca de comandos):
+//  1. E se o carro já estiver na faixa ESQUERDA? Pra onde ele deveria ir?
+//  2. Antes de trocar de faixa, olhem se a faixa nova está livre:
+//     sensor.distanciaObstaculo(ESQUERDA), (MEIO), (DIREITA)
+//  3. E se as duas faixas do lado estiverem ocupadas? Que tal controle.frear()?
+//  4. Na neblina vocês enxergam bem menos (sensor.neblina).
+//  5. Moedas dão pontos! Onde está a próxima? (sensor.faixaDaMoeda)
+//  6. Testem outra SEMENTE: um bom piloto funciona em qualquer estrada!
 </script>
 
 <script>
@@ -1361,9 +1352,21 @@ const realce = document.getElementById("realce");
 const numeros = document.getElementById("numeros");
 const statusEl = document.getElementById("status");
 const nomeDupla = document.getElementById("nomeDupla");
-const CHAVE_CODIGO = "sobeASerra.codigo.v4", CHAVE_NOME = "sobeASerra.nomePiloto";
-const EXEMPLO = typeof pilotoAutomatico === "function" ? pilotoAutomatico.toString()
-  : 'function pilotoAutomatico(controle, sensor) {\n  controle.acelerar();\n}';
+const CHAVE_CODIGO = "sobeASerra.codigo.v5", CHAVE_NOME = "sobeASerra.nomePiloto";
+// Código inicial (versão básica) que aparece no editor e volta no botão ↺ Exemplo
+const EXEMPLO = `function pilotoAutomatico(controle, sensor) {
+
+  // 1. Olhe o sensor: quanto espaço livre tem na minha faixa?
+  const espacoAqui = sensor.distanciaObstaculo(sensor.faixa);
+
+  // 2. Decida: tem obstáculo perto?
+  if (espacoAqui < 20) {
+    // 3. Mande um comando pro carro
+    controle.paraEsquerda();
+  }
+
+  // Se não mandar nenhum comando, o carro segue reto acelerando.
+}`;
 let linhaComErro = 0;
 
 // Deixa as mensagens de erro do navegador mais fáceis de entender
@@ -1481,23 +1484,58 @@ editor.addEventListener("keydown", e => {
 });
 editor.addEventListener("input", () => { linhaComErro = 0; atualizarEditor(); guardar(CHAVE_CODIGO, editor.value); });
 editor.addEventListener("scroll", sincronizarRolagem);
+// se a caixa do editor mudar de tamanho (janela, painéis), realinha as cores e os números de linha
+if (typeof ResizeObserver === "function") new ResizeObserver(() => sincronizarRolagem()).observe(editor);
 
-// --- depuração: mostra o comando e os sensores enquanto o carro anda ---
-const dbgComando = document.getElementById("dbgComando");
-const dbgSensores = document.getElementById("dbgSensores");
+// --- depuração ao vivo dentro da biblioteca de comandos ---
 const dbgHistorico = document.getElementById("dbgHistorico");
+const aoVivo = document.getElementById("aoVivo");
+const caixasValor = {};
+document.querySelectorAll("#colAjuda .valor").forEach(el => { caixasValor[el.dataset.valor] = el; });
+const itensComando = document.querySelectorAll("#colAjuda .item[data-comando]");
 let ultimaDepuracao = 0;
 function numeroBonito(v) { return v >= NADA_A_VISTA ? "999" : String(Math.round(v)); }
+function porFaixa(s, valorDe) {   // "ESQUERDA 999 · MEIO 14 · DIREITA 999", com a faixa do carro em destaque
+  return [ESQUERDA, MEIO, DIREITA].map(f => {
+    const t = (nomeDaFaixa(f) + ":").padEnd(10) + valorDe(f);
+    return f === s.faixa ? "<b>" + t + "  ◀ você</b>" : t;
+  }).join("\n");
+}
+function comandoAtivo() {
+  let c = jogo.comando || "";
+  if (!/esquerda|direita|frear/i.test(c) && jogo.ultimaAcao && jogo.tempo - jogo.ultimaAcao.t < 0.6) c = jogo.ultimaAcao.cmd;
+  if (/paraEsquerda|"esquerda"/.test(c)) return "paraEsquerda";
+  if (/paraDireita|"direita"/.test(c)) return "paraDireita";
+  if (/frear/.test(c)) return "frear";
+  return "acelerar";
+}
 function atualizarDepuracao() {
   const agora = performance.now();
   if (agora - ultimaDepuracao < 100) return;       // 10 vezes por segundo já basta
   ultimaDepuracao = agora;
-  if (jogo.modo !== "auto") { dbgComando.textContent = "—"; dbgSensores.textContent = "—"; dbgHistorico.textContent = ""; return; }
+  if (jogo.modo !== "auto") {
+    for (const k in caixasValor) caixasValor[k].innerHTML = "";
+    itensComando.forEach(el => el.classList.remove("ativo"));
+    dbgHistorico.textContent = "";
+    aoVivo.style.display = "";
+    return;
+  }
+  aoVivo.style.display = "none";
   const s = montarSensores();
-  dbgComando.textContent = jogo.comando;
-  dbgSensores.textContent = "faixa=" + nomeDaFaixa(s.faixa) + "  obstáculo: " +
-    [0, 1, 2].map(f => nomeDaFaixa(f) + "=" + numeroBonito(s.distanciaObstaculo(f))).join(" ") +
-    "  moeda=" + nomeDaFaixa(s.faixaDaMoeda) + (s.neblina ? "  🌫️neblina" : "");
+  const v = {
+    faixa: "<b>" + nomeDaFaixa(s.faixa) + "</b>",
+    distanciaObstaculo: porFaixa(s, f => numeroBonito(s.distanciaObstaculo(f))),
+    oQueTem: porFaixa(s, f => '"' + s.oQueTem(f) + '"'),
+    faixaDaMoeda: "<b>" + nomeDaFaixa(s.faixaDaMoeda) + "</b>",
+    distanciaMoeda: porFaixa(s, f => numeroBonito(s.distanciaMoeda(f))),
+    neblina: "<b>" + s.neblina + "</b>",
+    velocidade: "<b>" + s.velocidade + "</b> km/h",
+    tempoRestante: "<b>" + s.tempoRestante + "</b> s",
+    faltaParaMirante: "<b>" + s.faltaParaMirante + "</b> m",
+  };
+  for (const k in caixasValor) caixasValor[k].innerHTML = v[k] || "";
+  const ativo = comandoAtivo();
+  itensComando.forEach(el => el.classList.toggle("ativo", el.dataset.comando === ativo));
   dbgHistorico.textContent = jogo.historico.slice(-4).reverse().join("\n");
 }
 
